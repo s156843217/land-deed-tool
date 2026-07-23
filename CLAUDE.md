@@ -20,6 +20,7 @@
   - Storage：private bucket `deeds`，存謄本原始檔案，路徑 `{段小段}-{地號}/{timestamp}-{原始檔名}`。
   - Edge Function `parse-deed`：收謄本檔案（PDF 或圖片皆可，base64），呼叫 Google Gemini API 解析成結構化 JSON（用 Gemini 是因為使用者明確要求這塊先不要花錢，Gemini 有免費額度）。**API key 只放在 Supabase Edge Function secrets（`GEMINI_API_KEY`），前端永遠拿不到**，這是全 repo 最重要的安全規則，不要為了方便把 key 寫進前端程式碼。
   - 免費模型有輸出長度上限，謄本共有人多達數百人時（多代繼承常見）單次解析可能被截斷失敗，這是已知限制，先不處理，真的常遇到再考慮分批解析。
+  - 免費額度是「每個型號」各自獨立的每日配額（實測 gemini-2.5-flash 一天只有 20 次），`parse-deed/index.ts` 的 `GEMINI_MODELS` 是依序嘗試的備援清單，遇到 429 額度用完會自動換下一個型號，不是 bug；如果全部型號都額度用完，要嘛等隔天重置，要嘛去 aistudio.google.com 查目前還有額度的型號並加進清單。
   - 前端 UI 文案一律用中性字眼「AI 解析」，不要寫死「Gemini」或「Claude」——之後要換模型只改 `parse-deed/index.ts` 這一個檔案，UI 文案不用跟著改，避免重蹈 `rental-mgmt` 文案跟實際模型脫鉤的覆轍。
 - **部署**：GitHub 公開 repo + GitHub Pages，push `main` 自動上線（跟 linkou-crm/rental-mgmt 一致）。程式碼本身不含任何個資，真實資料都在 Supabase 後面靠登入保護。
 

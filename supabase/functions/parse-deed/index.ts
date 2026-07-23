@@ -11,10 +11,10 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// 2026-07 實測：這組 key 對 gemini-2.0-flash 的免費額度是 0（配額被導去新型號了），
-// 改用 gemini-2.5-flash 才有免費額度可以用。之後如果又遇到 429 配額錯誤，
-// 先去 https://aistudio.google.com 的 API Keys 頁面看目前有免費額度的是哪個型號。
-const GEMINI_MODEL = "gemini-2.5-flash";
+// 免費額度是「每個型號」各自獨立的每日配額，實測 gemini-2.5-flash 只有一天 20 次，
+// 測試/正式使用量一多很容易當天就用完。依序嘗試這個清單，前面的額度用完(429)就自動換下一個，
+// 不用整天卡住等隔天重置。gemini-2.0-flash 免費額度已經是 0，故不放進清單。
+const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.0-flash-lite"];
 
 // Gemini 的 responseSchema 語法是 OpenAPI 子集，跟一般 JSON Schema 不太一樣：
 // type 要大寫（STRING/NUMBER/INTEGER/OBJECT/ARRAY），「可能是 null」要用 nullable:true，不能用 type 陣列。
@@ -84,8 +84,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
     const body = {
       system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
       contents: [
@@ -109,20 +107,29 @@ Deno.serve(async (req: Request) => {
       },
     };
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    let text: string | undefined;
+    let lastErrorText = "";
+    for (const model of GEMINI_MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (!resp.ok) {
+      if (resp.ok) {
+        const json = await resp.json();
+        text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+        break;
+      }
+
       const errText = await resp.text();
-      throw new Error(`Gemini API 錯誤 (${resp.status}): ${errText}`);
+      lastErrorText = `Gemini API 錯誤 (${resp.status})[${model}]: ${errText}`;
+      // 429=額度用完才換下一個型號重試；其他錯誤（例如檔案格式問題）換型號也不會好，直接中止。
+      if (resp.status !== 429) throw new Error(lastErrorText);
     }
 
-    const json = await resp.json();
-    const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini 沒有回傳可用的內容，可能是被安全過濾器擋下或輸出被截斷");
+    if (!text) throw new Error(lastErrorText || "Gemini 沒有回傳可用的內容，可能是被安全過濾器擋下或輸出被截斷");
 
     const parsed = JSON.parse(text);
 
