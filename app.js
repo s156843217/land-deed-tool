@@ -222,8 +222,11 @@ $("#btnConfirmSave").addEventListener("click", async () => {
     if (parcelErr) throw parcelErr;
 
     // 2) 原始檔上傳到 Storage
+    // Supabase Storage 的路徑只能用英數字等安全字元，不能有中文，
+    // 所以資料夾用地號的 id（英數字），檔名只保留副檔名；中文原始檔名另外存在 documents.original_filename 顯示用。
     const file = previewState.file;
-    const storagePath = `${parcelPayload.section}-${parcelPayload.lot_no}/${Date.now()}-${file.name}`;
+    const ext = (file.name.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "") || "bin";
+    const storagePath = `${parcelRow.id}/${Date.now()}.${ext}`;
     const { error: uploadErr } = await sb.storage.from("deeds").upload(storagePath, file);
     if (uploadErr) throw uploadErr;
 
