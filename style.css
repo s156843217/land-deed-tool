@@ -113,10 +113,13 @@ table.deed-table {
 }
 
 /* 欄位較多的表格（例如共有人逐筆編輯表）在窄螢幕上不硬擠成一團，
-   改成保留每欄可讀寬度、讓外層 overflow-x:auto 的容器負責左右滑動 */
+   改成保留每欄可讀寬度、讓外層 overflow-x:auto 的容器負責左右滑動。
+   注意：table-layout:fixed 搭配 width:auto 在手機瀏覽器上不會乖乖照 colgroup
+   的像素寬度撐開（會被硬壓縮成貼合容器寬度），要用 width:max-content 才會
+   真的照 colgroup 總和撐開，配合外層 overflow-x:auto 才滑得動。 */
 table.deed-table.wide {
-  width: auto;
-  min-width: 100%;
+  width: max-content;
+  max-width: none;
 }
 
 table.deed-table th, table.deed-table td {
