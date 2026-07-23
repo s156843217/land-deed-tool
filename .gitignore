@@ -1,2 +1,6 @@
-config.js
+# 注意：config.js 內只有「公開的」Supabase URL + anon(publishable) key，
+# 這兩個值本來就設計成放在前端瀏覽器，搭配資料表 RLS 保護資料，可以進版控。
+# 真正的祕密（GEMINI_API_KEY）只放在 Supabase Edge Function 後端，絕不放這裡。
+
+# 真實謄本檔案、含個資的測試資料
 reference/

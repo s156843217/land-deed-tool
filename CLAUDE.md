@@ -26,7 +26,7 @@
 ## 3. 本 repo 專屬紅線
 
 - **謄本檔案（PDF/照片）本身、任何真實地主姓名/住址/持分資料**：不准 commit 進 git、不准貼進任何會公開的檔案（程式碼、issue、commit 訊息皆不行）。範例/測試資料一律用虛構的段小段、地號、假姓名假地址。
-- `config.js`（存 Supabase URL + anon key）：anon key 設計上可公開沒關係，但仍統一走 `.gitignore`，只 commit `config.example.js` 範本，避免將來換成別的 key 類型時搞混。
+- `config.js`（存 Supabase URL + anon/publishable key）：這兩個值設計上就是給前端瀏覽器用的，可以進版控，**不要**把它加進 `.gitignore`（GitHub Pages 需要這個檔案才能連上 Supabase）。真正的祕密只有 `GEMINI_API_KEY`，那個只放在 Supabase Edge Function 後端。
 - **解析結果一律要先給使用者複核確認過才寫入資料庫**——OCR/AI 解析難免有誤，真實地主資料要求正確，不可以解析完就無條件 upsert。
 - Edge Function 的 `ANTHROPIC_API_KEY` 用 `supabase secrets set` 設定，絕不寫進任何程式碼或 commit。
 

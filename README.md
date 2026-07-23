@@ -6,8 +6,8 @@
 
 純前端、零建置，直接用瀏覽器開 `index.html` 即可（`file://` 也能開，但登入/資料功能需要網路連到 Supabase）。
 
-1. 複製 `config.example.js` → `config.js`，填入你自己 Supabase 專案的 `Project URL` 與 `anon public key`（Supabase Studio → Settings → API）。
-2. `config.js` 已被 `.gitignore` 排除，不會進版控。
+1. 複製 `config.example.js` → `config.js`，填入你自己 Supabase 專案的 `Project URL` 與 `anon public / publishable key`（Supabase Studio → Settings → API）。
+2. `config.js` 裡的這兩個值設計上就是給前端用的，會進版控、跟著部署到 GitHub Pages（真正機密的 `GEMINI_API_KEY` 另外只放在 Supabase Edge Function 後端）。
 
 ## 第一次建置 Supabase 專案的步驟
 
