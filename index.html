@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>土地謄本管理工具</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -157,13 +157,17 @@
       <div style="overflow-x:auto;">
         <table class="deed-table">
           <colgroup>
-            <col style="width:8%"><col style="width:11%"><col style="width:33%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:12%">
+            <col style="width:6%"><col style="width:8%"><col style="width:11%"><col style="width:29%"><col style="width:11%"><col style="width:11%"><col style="width:12%"><col style="width:12%">
           </colgroup>
           <thead>
-            <tr><th>登記次序</th><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
+            <tr><th><input type="checkbox" id="ownerSelectAll"></th><th>登記次序</th><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
           </thead>
           <tbody id="ownerDetailBody"></tbody>
         </table>
+      </div>
+      <div style="margin:10px 0;">
+        <button id="btnDeleteOwners" class="btn danger">刪除勾選的共有人紀錄</button>
+        <span id="deleteOwnersStatus" class="hint"></span>
       </div>
       <h4>相關謄本原始檔</h4>
       <ul id="documentList"></ul>
@@ -173,6 +177,6 @@
 </main>
 
 <script src="config.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

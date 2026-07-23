@@ -565,9 +565,14 @@ function renderParcelList(parcels) {
   $("#parcelDetailPanel").classList.add("hidden");
 }
 
+let currentDetailParcel = null;
+
 async function showParcelDetail(parcel) {
+  currentDetailParcel = parcel;
   $("#parcelDetailPanel").classList.remove("hidden");
   $("#parcelDetailTitle").textContent = `${parcel.section} ${parcel.lot_no} 地號 — 共有人明細`;
+  $("#ownerSelectAll").checked = false;
+  $("#deleteOwnersStatus").textContent = "";
 
   const { data: owners } = await sb
     .from("owners")
@@ -581,7 +586,7 @@ async function showParcelDetail(parcel) {
   (owners || []).forEach((o) => {
     const share = o.share_numerator && o.share_denominator ? `${o.share_numerator}/${o.share_denominator}` : "";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${o.reg_sequence ?? ""}</td><td>${o.name ?? ""}</td><td>${o.address ?? ""}</td><td>${share}</td><td>${o.share_area_ping ?? ""}</td><td>${o.reg_date ?? ""}</td><td>${o.reg_reason ?? ""}</td>`;
+    tr.innerHTML = `<td><input type="checkbox" class="owner-select" data-id="${o.id}"></td><td>${o.reg_sequence ?? ""}</td><td>${o.name ?? ""}</td><td>${o.address ?? ""}</td><td>${share}</td><td>${o.share_area_ping ?? ""}</td><td>${o.reg_date ?? ""}</td><td>${o.reg_reason ?? ""}</td>`;
     body.appendChild(tr);
   });
 
@@ -604,3 +609,30 @@ async function showParcelDetail(parcel) {
     list.appendChild(li);
   }
 }
+
+$("#ownerSelectAll").addEventListener("change", (e) => {
+  document.querySelectorAll("#ownerDetailBody .owner-select").forEach((cb) => {
+    cb.checked = e.target.checked;
+  });
+});
+
+// 刪除共有人紀錄：要先勾選、跳確認對話框，避免手滑誤刪，且支援一次勾多筆一起刪
+$("#btnDeleteOwners").addEventListener("click", async () => {
+  const ids = [...document.querySelectorAll("#ownerDetailBody .owner-select:checked")].map((cb) => cb.dataset.id);
+  if (ids.length === 0) {
+    $("#deleteOwnersStatus").textContent = "請先勾選要刪除的列";
+    return;
+  }
+  const ok = window.confirm(`確定要刪除這 ${ids.length} 筆共有人紀錄嗎？此動作無法復原。`);
+  if (!ok) return;
+
+  $("#deleteOwnersStatus").textContent = "刪除中…";
+  const { error } = await sb.from("owners").delete().in("id", ids);
+  if (error) {
+    $("#deleteOwnersStatus").textContent = "刪除失敗：" + error.message;
+    return;
+  }
+  if (currentDetailParcel) await showParcelDetail(currentDetailParcel);
+  await runSearch($("#searchInput").value.trim()); // 讓地號總覽的共有人數同步更新
+  $("#deleteOwnersStatus").textContent = `已刪除 ${ids.length} 筆`;
+});
