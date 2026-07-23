@@ -601,11 +601,17 @@ async function showParcelDetail(parcel) {
   for (const doc of docs || []) {
     const { data: signed } = await sb.storage.from("deeds").createSignedUrl(doc.storage_path, 300);
     const li = document.createElement("li");
-    if (signed?.signedUrl) {
-      li.innerHTML = `<a href="${signed.signedUrl}" target="_blank" rel="noopener">${doc.original_filename}</a>（上傳於 ${new Date(doc.uploaded_at).toLocaleString("zh-TW")}）`;
-    } else {
-      li.textContent = `${doc.original_filename}（連結產生失敗）`;
-    }
+    const linkHtml = signed?.signedUrl
+      ? `<a href="${signed.signedUrl}" target="_blank" rel="noopener">${doc.original_filename}</a>`
+      : `${doc.original_filename}（連結產生失敗）`;
+    li.innerHTML = `${linkHtml}（上傳於 ${new Date(doc.uploaded_at).toLocaleString("zh-TW")}） <button type="button" class="btn danger btn-delete-doc" style="padding:2px 8px;font-size:0.8rem;">刪除</button>`;
+    li.querySelector(".btn-delete-doc").addEventListener("click", async () => {
+      const ok = window.confirm(`確定要刪除這份謄本檔案「${doc.original_filename}」嗎？此動作無法復原（不會影響已存的共有人資料）。`);
+      if (!ok) return;
+      await sb.storage.from("deeds").remove([doc.storage_path]);
+      await sb.from("documents").delete().eq("id", doc.id);
+      if (currentDetailParcel) await showParcelDetail(currentDetailParcel);
+    });
     list.appendChild(li);
   }
 }
