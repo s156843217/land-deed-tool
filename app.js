@@ -241,7 +241,9 @@ async function addPreviewCard(parcel, owners, file) {
         throw new Error("段小段與地號為必填，請確認解析結果");
       }
       await saveDeed(parcelPayload, collectOwnersFromBody(ownersBody), file);
-      statusEl.textContent = "已存入總表";
+      statusEl.textContent = "✅ 已成功存入總表";
+      statusEl.classList.add("save-success");
+      card.classList.add("saved");
       btn.disabled = true;
       card.querySelector(".pv-cancel").textContent = "關閉";
     } catch (err) {
@@ -262,7 +264,7 @@ async function addPreviewCard(parcel, owners, file) {
       .maybeSingle();
     if (existing && existing.owner_count > 0) {
       const note = card.querySelector(".pv-existing-note");
-      note.textContent = `提醒：這個地號目前已存有 ${existing.owner_count} 筆共有人紀錄。登記次序相同的會自動更新覆蓋，不會產生重複；如果是全新的登記次序才會新增一筆。`;
+      note.textContent = `⚠️ 提醒：這個地號目前已存有 ${existing.owner_count} 筆共有人紀錄。登記次序相同的會自動更新覆蓋，不會產生重複；如果是全新的登記次序才會新增一筆。`;
       note.classList.remove("hidden");
     }
   }

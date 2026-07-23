@@ -188,6 +188,29 @@ table.deed-table th {
   background: #eef2ea;
 }
 
+/* 重複上傳同一地號的提醒：要顯眼，不要只是一行小灰字容易被忽略 */
+.warning-box {
+  background: #fdf3e3;
+  border: 1px solid #e0a94a;
+  color: #7a5314;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-size: 0.92rem;
+}
+
+/* 存檔成功：整張卡片變色，一眼就能確認存好了，不用跑去總表頁面確認 */
+.preview-card.saved {
+  border-color: var(--primary);
+  background: #f2f7ef;
+}
+
+.save-success {
+  color: var(--primary-dark);
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+
 @media (max-width: 640px) {
   header.site-header {
     flex-direction: column;
