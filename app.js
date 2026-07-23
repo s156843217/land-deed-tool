@@ -555,15 +555,56 @@ async function runSearch(keyword) {
 function renderParcelList(parcels) {
   const body = $("#parcelListBody");
   body.innerHTML = "";
+  $("#parcelSelectAll").checked = false;
+  $("#deleteParcelsStatus").textContent = "";
   parcels.forEach((p) => {
     const tr = document.createElement("tr");
     tr.className = "parcel-row";
-    tr.innerHTML = `<td>${p.section}</td><td>${p.lot_no}</td><td>${p.area_ping ?? ""}</td><td>${p.owner_count}</td><td>${p.land_use ?? ""}</td>`;
+    tr.innerHTML = `<td><input type="checkbox" class="parcel-select" data-id="${p.id}"></td><td>${p.section}</td><td>${p.lot_no}</td><td>${p.area_ping ?? ""}</td><td>${p.owner_count}</td><td>${p.land_use ?? ""}</td>`;
+    // 勾選框本身點擊不要觸發整列的「開啟明細」
+    tr.querySelector(".parcel-select").addEventListener("click", (e) => e.stopPropagation());
     tr.addEventListener("click", () => showParcelDetail(p));
     body.appendChild(tr);
   });
   $("#parcelDetailPanel").classList.add("hidden");
 }
+
+$("#parcelSelectAll").addEventListener("change", (e) => {
+  document.querySelectorAll("#parcelListBody .parcel-select").forEach((cb) => {
+    cb.checked = e.target.checked;
+  });
+});
+
+// 刪除一個地號（連同共有人明細 cascade、謄本原始檔紀錄與 Storage 檔案），
+// 單筆刪除跟批次刪除共用這個函式，不要各寫一份邏輯
+async function deleteParcelById(id) {
+  const { data: docs } = await sb.from("documents").select("storage_path").eq("parcel_id", id);
+  const paths = (docs || []).map((d) => d.storage_path);
+  if (paths.length > 0) await sb.storage.from("deeds").remove(paths);
+  await sb.from("documents").delete().eq("parcel_id", id);
+  const { error } = await sb.from("parcels").delete().eq("id", id); // owners 是 on delete cascade
+  if (error) throw error;
+}
+
+$("#btnDeleteParcels").addEventListener("click", async () => {
+  const ids = [...document.querySelectorAll("#parcelListBody .parcel-select:checked")].map((cb) => cb.dataset.id);
+  if (ids.length === 0) {
+    $("#deleteParcelsStatus").textContent = "請先勾選要刪除的地號";
+    return;
+  }
+  const ok = window.confirm(`確定要刪除這 ${ids.length} 筆地號嗎？底下所有共有人紀錄跟謄本原始檔都會一併刪除，此動作無法復原。`);
+  if (!ok) return;
+
+  $("#deleteParcelsStatus").textContent = "刪除中…";
+  try {
+    for (const id of ids) await deleteParcelById(id);
+    await runSearch($("#searchInput").value.trim());
+    $("#deleteParcelsStatus").textContent = `已刪除 ${ids.length} 筆地號`;
+  } catch (err) {
+    console.error(err);
+    $("#deleteParcelsStatus").textContent = "刪除失敗：" + (err.message || err);
+  }
+});
 
 let currentDetailParcel = null;
 
@@ -583,12 +624,7 @@ async function showParcelDetail(parcel) {
 
   const body = $("#ownerDetailBody");
   body.innerHTML = "";
-  (owners || []).forEach((o) => {
-    const share = o.share_numerator && o.share_denominator ? `${o.share_numerator}/${o.share_denominator}` : "";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td><input type="checkbox" class="owner-select" data-id="${o.id}"></td><td>${o.reg_sequence ?? ""}</td><td>${o.name ?? ""}</td><td>${o.address ?? ""}</td><td>${share}</td><td>${o.share_area_ping ?? ""}</td><td>${o.reg_date ?? ""}</td><td>${o.reg_reason ?? ""}</td>`;
-    body.appendChild(tr);
-  });
+  (owners || []).forEach((o) => body.appendChild(buildOwnerDetailRow(o)));
 
   const { data: docs } = await sb
     .from("documents")
@@ -596,6 +632,8 @@ async function showParcelDetail(parcel) {
     .eq("parcel_id", parcel.id)
     .order("uploaded_at", { ascending: false });
 
+  $("#docSelectAll").checked = false;
+  $("#deleteDocsStatus").textContent = "";
   const list = $("#documentList");
   list.innerHTML = "";
   for (const doc of docs || []) {
@@ -604,16 +642,50 @@ async function showParcelDetail(parcel) {
     const linkHtml = signed?.signedUrl
       ? `<a href="${signed.signedUrl}" target="_blank" rel="noopener">${doc.original_filename}</a>`
       : `${doc.original_filename}（連結產生失敗）`;
-    li.innerHTML = `${linkHtml}（上傳於 ${new Date(doc.uploaded_at).toLocaleString("zh-TW")}） <button type="button" class="btn danger btn-delete-doc" style="padding:2px 8px;font-size:0.8rem;">刪除</button>`;
-    li.querySelector(".btn-delete-doc").addEventListener("click", async () => {
-      const ok = window.confirm(`確定要刪除這份謄本檔案「${doc.original_filename}」嗎？此動作無法復原（不會影響已存的共有人資料）。`);
-      if (!ok) return;
-      await sb.storage.from("deeds").remove([doc.storage_path]);
-      await sb.from("documents").delete().eq("id", doc.id);
-      if (currentDetailParcel) await showParcelDetail(currentDetailParcel);
-    });
+    li.innerHTML = `<input type="checkbox" class="doc-select" data-id="${doc.id}" data-path="${doc.storage_path}"> ${linkHtml}（上傳於 ${new Date(doc.uploaded_at).toLocaleString("zh-TW")}）`;
     list.appendChild(li);
   }
+}
+
+// 共有人明細一列：姓名/住址/聯絡電話可以直接編輯，改完按「儲存」才會真的寫回資料庫，
+// 其他欄位（登記次序/持分/登記日期/登記原因）來自官方謄本，維持唯讀，
+// 真的要改要透過重新上傳解析那個流程去修正，避免手動亂改跟原始文件對不起來。
+function buildOwnerDetailRow(o) {
+  const share = o.share_numerator && o.share_denominator ? `${o.share_numerator}/${o.share_denominator}` : "";
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td><input type="checkbox" class="owner-select" data-id="${o.id}"></td>
+    <td>${o.reg_sequence ?? ""}</td>
+    <td><input type="text" class="od-name" value="${o.name ?? ""}"></td>
+    <td><input type="text" class="od-address" value="${o.address ?? ""}"></td>
+    <td><input type="text" class="od-phone" value="${o.phone ?? ""}"></td>
+    <td>${share}</td>
+    <td>${o.share_area_ping ?? ""}</td>
+    <td>${o.reg_date ?? ""}</td>
+    <td>${o.reg_reason ?? ""}</td>
+    <td><button type="button" class="btn od-save" style="padding:4px 8px;font-size:0.8rem;">儲存</button></td>
+  `;
+  tr.querySelector(".od-save").addEventListener("click", async (e) => {
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = "存中";
+    const { error } = await sb
+      .from("owners")
+      .update({
+        name: tr.querySelector(".od-name").value.trim() || null,
+        address: tr.querySelector(".od-address").value.trim() || null,
+        phone: tr.querySelector(".od-phone").value.trim() || null,
+      })
+      .eq("id", o.id);
+    if (error) {
+      console.error(error);
+      btn.textContent = "失敗";
+    } else {
+      btn.textContent = "✓已存";
+    }
+    btn.disabled = false;
+  });
+  return tr;
 }
 
 $("#ownerSelectAll").addEventListener("change", (e) => {
@@ -654,22 +726,43 @@ $("#btnDeleteParcel").addEventListener("click", async () => {
 
   $("#deleteParcelStatus").textContent = "刪除中…";
   try {
-    const { data: docs } = await sb.from("documents").select("storage_path").eq("parcel_id", p.id);
-    const paths = (docs || []).map((d) => d.storage_path);
-    if (paths.length > 0) await sb.storage.from("deeds").remove(paths);
-
-    const { error: docsErr } = await sb.from("documents").delete().eq("parcel_id", p.id);
-    if (docsErr) throw docsErr;
-
-    // owners 是 on delete cascade，刪 parcels 這一列會自動一起刪掉底下的共有人明細
-    const { error: parcelErr } = await sb.from("parcels").delete().eq("id", p.id);
-    if (parcelErr) throw parcelErr;
-
+    await deleteParcelById(p.id);
     currentDetailParcel = null;
     $("#parcelDetailPanel").classList.add("hidden");
     await runSearch($("#searchInput").value.trim());
   } catch (err) {
     console.error(err);
     $("#deleteParcelStatus").textContent = "刪除失敗：" + (err.message || err);
+  }
+});
+
+$("#docSelectAll").addEventListener("change", (e) => {
+  document.querySelectorAll("#documentList .doc-select").forEach((cb) => {
+    cb.checked = e.target.checked;
+  });
+});
+
+// 刪除勾選的謄本原始檔（連同 Storage 裡的檔案），支援一次勾多筆，跳確認對話框
+$("#btnDeleteDocs").addEventListener("click", async () => {
+  const checked = [...document.querySelectorAll("#documentList .doc-select:checked")];
+  if (checked.length === 0) {
+    $("#deleteDocsStatus").textContent = "請先勾選要刪除的檔案";
+    return;
+  }
+  const ok = window.confirm(`確定要刪除這 ${checked.length} 份謄本檔案嗎？此動作無法復原（不會影響已存的共有人資料）。`);
+  if (!ok) return;
+
+  $("#deleteDocsStatus").textContent = "刪除中…";
+  try {
+    const paths = checked.map((cb) => cb.dataset.path);
+    const ids = checked.map((cb) => cb.dataset.id);
+    await sb.storage.from("deeds").remove(paths);
+    const { error } = await sb.from("documents").delete().in("id", ids);
+    if (error) throw error;
+    if (currentDetailParcel) await showParcelDetail(currentDetailParcel);
+    $("#deleteDocsStatus").textContent = `已刪除 ${checked.length} 份檔案`;
+  } catch (err) {
+    console.error(err);
+    $("#deleteDocsStatus").textContent = "刪除失敗：" + (err.message || err);
   }
 });

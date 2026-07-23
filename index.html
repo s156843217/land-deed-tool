@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>土地謄本管理工具</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -72,7 +72,7 @@
 
       <h4>共有人明細（<span class="pv-owner-count">0</span> 人）</h4>
       <div style="overflow-x:auto;">
-        <table class="deed-table wide">
+        <table class="deed-table wide" style="width:990px;">
           <colgroup>
             <col style="width:70px"><col style="width:80px"><col style="width:200px"><col style="width:70px"><col style="width:70px">
             <col style="width:80px"><col style="width:80px"><col style="width:90px"><col style="width:90px"><col style="width:90px"><col style="width:70px">
@@ -115,7 +115,7 @@
       <h3>匯入預覽</h3>
       <p id="excelSummary" class="hint"></p>
       <div style="overflow-x:auto;">
-        <table class="deed-table wide">
+        <table class="deed-table">
           <thead>
             <tr><th>段小段</th><th>地號</th><th>共有人數</th></tr>
           </thead>
@@ -144,23 +144,35 @@
       <h3>地號總覽</h3>
       <div style="overflow-x:auto;">
         <table class="deed-table">
+          <colgroup>
+            <col style="width:6%"><col style="width:20%"><col style="width:16%"><col style="width:18%"><col style="width:14%"><col style="width:26%">
+          </colgroup>
           <thead>
-            <tr><th>段小段</th><th>地號</th><th>總面積(坪)</th><th>共有人數</th><th>地目/使用分區</th></tr>
+            <tr><th><input type="checkbox" id="parcelSelectAll"></th><th>段小段</th><th>地號</th><th>總面積(坪)</th><th>共有人數</th><th>地目/使用分區</th></tr>
           </thead>
           <tbody id="parcelListBody"></tbody>
         </table>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="btnDeleteParcels" class="btn danger">刪除勾選的地號（連同共有人明細與謄本檔案）</button>
+        <span id="deleteParcelsStatus" class="hint"></span>
       </div>
     </div>
 
     <div class="panel hidden" id="parcelDetailPanel">
       <h3 id="parcelDetailTitle">地號明細</h3>
+      <p class="hint">姓名、住址、聯絡電話可以直接改，改完按該列的「儲存」即可（例如後來查到本名或拿到電話）。</p>
       <div style="overflow-x:auto;">
-        <table class="deed-table">
+        <table class="deed-table wide" id="ownerDetailTable" style="width:886px;">
           <colgroup>
-            <col style="width:6%"><col style="width:8%"><col style="width:11%"><col style="width:29%"><col style="width:11%"><col style="width:11%"><col style="width:12%"><col style="width:12%">
+            <col style="width:36px"><col style="width:70px"><col style="width:100px"><col style="width:200px"><col style="width:110px">
+            <col style="width:70px"><col style="width:80px"><col style="width:80px"><col style="width:80px"><col style="width:60px">
           </colgroup>
           <thead>
-            <tr><th><input type="checkbox" id="ownerSelectAll"></th><th>登記次序</th><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
+            <tr>
+              <th><input type="checkbox" id="ownerSelectAll"></th><th>登記次序</th><th>姓名</th><th>住址</th><th>聯絡電話</th>
+              <th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th><th></th>
+            </tr>
           </thead>
           <tbody id="ownerDetailBody"></tbody>
         </table>
@@ -169,8 +181,13 @@
         <button id="btnDeleteOwners" class="btn danger">刪除勾選的共有人紀錄</button>
         <span id="deleteOwnersStatus" class="hint"></span>
       </div>
-      <h4>相關謄本原始檔</h4>
+
+      <h4>相關謄本原始檔　<label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" id="docSelectAll"> 全選</label></h4>
       <ul id="documentList"></ul>
+      <div style="margin:10px 0;">
+        <button id="btnDeleteDocs" class="btn danger">刪除勾選的謄本檔案</button>
+        <span id="deleteDocsStatus" class="hint"></span>
+      </div>
 
       <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">
       <button id="btnDeleteParcel" class="btn danger">刪除此地號（連同共有人明細與謄本檔案）</button>
@@ -181,6 +198,6 @@
 </main>
 
 <script src="config.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

@@ -119,8 +119,8 @@ table.deed-table {
    改成直接寫死明確的 px 寬度最可靠，不要依賴瀏覽器自己去算。
    目前 pv_owners_table 的 colgroup 總和是 990px，之後改欄位要記得同步調整。 */
 table.deed-table.wide {
-  width: 990px;
   max-width: none;
+  /* 各自的實際寬度用 inline style="width:...px" 依 colgroup 總和設定，不要在這裡寫死共用值 */
 }
 
 table.deed-table th, table.deed-table td {

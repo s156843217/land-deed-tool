@@ -71,6 +71,7 @@ create table owners (
   reg_sequence integer,        -- 登記次序，同地號內的唯一流水號
   name text,                   -- 所有權人姓名
   address text,                -- 住址
+  phone text,                  -- 聯絡電話，謄本上沒有這欄，是後續人工得知才補上的，AI 不會填這欄
   share_numerator bigint,      -- 持分分子
   share_denominator bigint,    -- 持分分母
   share_area_sqm numeric,      -- 持分面積(㎡)
