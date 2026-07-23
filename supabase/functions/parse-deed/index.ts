@@ -84,32 +84,44 @@ Deno.serve(async (req: Request) => {
     }
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");
-    const body = {
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inline_data: { mime_type, data: file_base64 } },
-            { text: `請解析這份謄本（檔名：${filename ?? "未知"}），輸出結構化資料。` },
-          ],
-        },
-      ],
-      generationConfig: {
+
+    // 備援型號不一定支援跟主力型號一樣的參數（實測 gemini-flash-lite-latest 加 thinkingConfig
+    // 會直接 400 Invalid argument），所以 generationConfig 依型號各自決定，不要整包共用。
+    function buildGenerationConfig(model: string) {
+      const cfg: Record<string, unknown> = {
         responseMimeType: "application/json",
         responseSchema: DEED_SCHEMA,
-        // gemini-2.5-flash 預設會先「思考」再回答，思考過程也會占用 maxOutputTokens 額度，
-        // 這裡的任務是單純擷取資料不需要推理，關掉可以把額度留給真正的 JSON 輸出、也比較快。
-        thinkingConfig: { thinkingBudget: 0 },
         // 免費版模型的輸出長度還是有上限。如果謄本共有人多達數百人（多代繼承常見），
         // 單次回應仍可能被截斷解析失敗——這是已知限制，之後真的常常遇到再考慮分批處理。
         maxOutputTokens: 65536,
+      };
+      // gemini-2.5-flash 預設會先「思考」再回答，思考過程也會占用 maxOutputTokens 額度，
+      // 這裡的任務是單純擷取資料不需要推理，關掉可以把額度留給真正的 JSON 輸出、也比較快。
+      // 其他備援型號不支援這個參數，不要加。
+      if (model === "gemini-2.5-flash") {
+        cfg.thinkingConfig = { thinkingBudget: 0 };
+      }
+      return cfg;
+    }
+
+    const contents = [
+      {
+        role: "user",
+        parts: [
+          { inline_data: { mime_type, data: file_base64 } },
+          { text: `請解析這份謄本（檔名：${filename ?? "未知"}），輸出結構化資料。` },
+        ],
       },
-    };
+    ];
 
     let text: string | undefined;
     let lastErrorText = "";
     for (const model of GEMINI_MODELS) {
+      const body = {
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: buildGenerationConfig(model),
+      };
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const resp = await fetch(url, {
         method: "POST",
