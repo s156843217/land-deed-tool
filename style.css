@@ -112,6 +112,13 @@ table.deed-table {
   table-layout: fixed;
 }
 
+/* 欄位較多的表格（例如共有人逐筆編輯表）在窄螢幕上不硬擠成一團，
+   改成保留每欄可讀寬度、讓外層 overflow-x:auto 的容器負責左右滑動 */
+table.deed-table.wide {
+  width: auto;
+  min-width: 100%;
+}
+
 table.deed-table th, table.deed-table td {
   border: 1px solid var(--border);
   padding: 6px 8px;

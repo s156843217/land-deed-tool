@@ -35,7 +35,13 @@
 見 `supabase/schema.sql`。兩層設計：
 - `parcels`：一個地號一列（段小段＋地號 unique）。
 - `owners`：一個共有人一列，`parcel_id` 外鍵掛在對應地號底下，`document_id` 外鍵指向來源謄本。
-- `documents`：每次上傳的謄本檔案紀錄，`storage_path` 指向 Storage 裡的原始檔案。
+  - **`reg_sequence`（登記次序）是防重複的關鍵欄位**：謄本所有權部裡每筆登記事件的流水號，同一地號內遞增且唯一，所有權換手一定會產生新號碼。存檔用 `upsert(..., {onConflict:'parcel_id,reg_sequence'})`，同地號+同登記次序視為同一筆，重複上傳同一份謄本會覆蓋更新、不會產生看起來像多一位共有人的假重複；AI 解析不到（null）就一律當新資料插入（null 不會互相衝突）。這是使用者本人指出的正確判斷依據，不要改回單純 insert。
+- `documents`：每次上傳的謄本檔案紀錄，`storage_path` 指向 Storage 裡的原始檔案，這張表是全量保留（不 upsert），同一地號可以有多次不同時間上傳的紀錄，方便之後回頭比對「上次調閱到現在有沒有異動」。
+
+## 4.1 上傳流程
+
+- 上傳頁支援一次選多個檔案（`multiple`），依序呼叫 `parse-deed` 解析，每份各自產生一張獨立的核對卡片（`#previewCardTemplate` clone，用 class 選取、不能用 id，因為同頁可能同時有多張卡片），各自核對、各自送出存檔，不會不核對就整批硬存。
+- Excel 匯入頁（`pageImport`）：用 SheetJS（CDN `xlsx.full.min.js`）在瀏覽器端直接解析已經整理好的舊總表 xlsx，不呼叫 AI，欄位比對表在 `app.js` 的 `EXCEL_HEADER_MAP`，用來把使用者既有格式（跟她原本的 Excel 總表一致）直接匯入 `parcels`/`owners`。
 
 RLS 沿用 linkou-crm 的簡單模式：兩個帳號互信，policy 寫 `using (true) for authenticated`，靠「封閉註冊、只開白名單帳號」防外人，不做 owner_id 過濾（因為就只有兩個互信的人共用全部資料）。
 

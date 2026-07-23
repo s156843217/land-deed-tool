@@ -38,10 +38,11 @@ const DEED_SCHEMA = {
       items: {
         type: "OBJECT",
         required: [
-          "name", "address", "share_numerator", "share_denominator",
+          "reg_sequence", "name", "address", "share_numerator", "share_denominator",
           "share_area_sqm", "share_area_ping", "reg_date", "reg_reason", "reason_date",
         ],
         properties: {
+          reg_sequence: { type: "INTEGER", nullable: true, description: "登記次序：所有權部裡這筆登記事件的流水號，同一地號內遞增且唯一，查不到就 null" },
           name: { type: "STRING", nullable: true, description: "所有權人姓名，謄本上若已模糊處理就照原樣輸出" },
           address: { type: "STRING", nullable: true },
           share_numerator: { type: "INTEGER", nullable: true, description: "持分分子，保留謄本原始整數，不要自行化簡分數" },
@@ -65,6 +66,7 @@ const SYSTEM_PROMPT = `你是土地謄本（土地登記謄本）資料解析助
 - 持分分子分母要保留謄本原始整數，不要自行約分化簡。
 - 日期一律保留謄本原文的民國年格式（例如 068/07/31），不要換算成西元年。
 - 一份謄本通常對應一筆地號，owners 陣列要列出該地號謄本上出現的「每一位」所有權人，即使有幾百位也要全部列出，不要省略或只列前幾筆。
+- 每一位所有權人都要擷取「登記次序」（所有權部裡該筆登記的流水號），這是判斷是否為同一筆登記記錄的重要依據，務必仔細找，真的沒有才輸出 null。
 - 謄本上姓名若已經是官方模糊處理過的格式（例如只留姓氏），就照原樣輸出，不要試圖還原。`;
 
 Deno.serve(async (req: Request) => {

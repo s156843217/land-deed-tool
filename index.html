@@ -6,6 +6,7 @@
 <title>土地謄本管理工具</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -31,6 +32,7 @@
   <h1>土地謄本管理工具</h1>
   <nav class="site-nav">
     <button id="navUpload" class="active">上傳謄本</button>
+    <button id="navImport">Excel 匯入</button>
     <button id="navSearch">總表查詢</button>
     <button id="navLogout" title="登出">登出</button>
   </nav>
@@ -42,46 +44,88 @@
   <section id="pageUpload">
     <div class="panel">
       <h2>上傳謄本</h2>
-      <p class="hint">支援電子謄本 PDF，或紙本掃描/照片（JPG、PNG）。上傳後會用 AI 解析，解析完請務必核對過再送出存檔。</p>
-      <input type="file" id="deedFile" accept="application/pdf,image/*">
+      <p class="hint">支援電子謄本 PDF，或紙本掃描/照片（JPG、PNG），可一次選多個檔案批次上傳。上傳後會依序用 AI 解析，每一份都務必核對過再各自送出存檔。</p>
+      <input type="file" id="deedFile" accept="application/pdf,image/*" multiple>
       <div style="margin-top:10px;">
         <button id="btnParse" class="btn">開始解析</button>
         <span id="parseStatus" class="hint"></span>
       </div>
     </div>
 
-    <div class="panel hidden" id="previewPanel">
-      <h2>解析結果（請核對後再送出）</h2>
+    <div id="previewList"></div>
+  </section>
 
-      <h3>地號資訊</h3>
-      <div class="field"><label>段小段</label><input type="text" id="pv_section"></div>
-      <div class="field"><label>地號</label><input type="text" id="pv_lot_no"></div>
-      <div class="field"><label>總面積（㎡）</label><input type="number" id="pv_area_sqm" step="any"></div>
-      <div class="field"><label>總面積（坪）</label><input type="number" id="pv_area_ping" step="any"></div>
-      <div class="field"><label>地目 / 使用分區</label><input type="text" id="pv_land_use"></div>
+  <!-- 一份謄本的解析結果卡片樣板，一份檔案一張，用 class 而非 id 以支援同時多張 -->
+  <template id="previewCardTemplate">
+    <div class="panel preview-card">
+      <h3 class="pv-filename"></h3>
+      <p class="hint pv-cardstatus"></p>
 
-      <h3>共有人明細（<span id="pv_owner_count">0</span> 人）</h3>
+      <h4>地號資訊</h4>
+      <div class="field"><label>段小段</label><input type="text" class="pv-section"></div>
+      <div class="field"><label>地號</label><input type="text" class="pv-lot_no"></div>
+      <div class="field"><label>總面積（㎡）</label><input type="number" class="pv-area_sqm" step="any"></div>
+      <div class="field"><label>總面積（坪）</label><input type="number" class="pv-area_ping" step="any"></div>
+      <div class="field"><label>地目 / 使用分區</label><input type="text" class="pv-land_use"></div>
+
+      <p class="hint pv-existing-note hidden"></p>
+
+      <h4>共有人明細（<span class="pv-owner-count">0</span> 人）</h4>
       <div style="overflow-x:auto;">
-        <table class="deed-table" id="pv_owners_table">
+        <table class="deed-table wide">
           <colgroup>
-            <col style="width:10%"><col style="width:24%"><col style="width:7%"><col style="width:7%">
-            <col style="width:8%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:9%">
+            <col style="width:70px"><col style="width:80px"><col style="width:200px"><col style="width:70px"><col style="width:70px">
+            <col style="width:80px"><col style="width:80px"><col style="width:90px"><col style="width:90px"><col style="width:90px"><col style="width:70px">
           </colgroup>
           <thead>
             <tr>
-              <th>姓名</th><th>住址</th><th>持分分子</th><th>持分分母</th>
+              <th>登記次序</th><th>姓名</th><th>住址</th><th>持分分子</th><th>持分分母</th>
               <th>持分面積㎡</th><th>持分面積坪</th><th>登記日期</th><th>登記原因</th><th>原因發生日期</th><th></th>
             </tr>
           </thead>
-          <tbody id="pv_owners_body"></tbody>
+          <tbody class="pv-owners-body"></tbody>
         </table>
       </div>
-      <button id="btnAddOwnerRow" class="btn secondary" style="margin-top:8px;">＋新增一列</button>
+      <button type="button" class="btn secondary pv-add-row" style="margin-top:8px;">＋新增一列</button>
 
       <div style="margin-top:16px;">
-        <button id="btnConfirmSave" class="btn">確認無誤，存入總表</button>
-        <button id="btnCancelPreview" class="btn secondary">取消</button>
-        <span id="saveStatus" class="hint"></span>
+        <button type="button" class="btn pv-confirm">確認無誤，存入總表</button>
+        <button type="button" class="btn secondary pv-cancel">取消</button>
+        <span class="hint pv-savestatus"></span>
+      </div>
+    </div>
+  </template>
+
+  <!-- Excel 匯入頁：把已經整理好的舊總表(xlsx)直接匯入，不用跑 AI 解析 -->
+  <section id="pageImport" class="hidden">
+    <div class="panel">
+      <h2>Excel 匯入</h2>
+      <p class="hint">
+        適合把你原本已經人工整理好的總表 Excel 直接搬進系統，不會呼叫 AI。
+        欄位需包含：段小段、地號、面積(㎡)、面積(坪)、所有權人、持分分子、持分分母、持分面積(㎡)、持分面積(坪)、住址、登記日期、登記原因、原因發生日期（欄名順序不拘，找不到的欄位會留空）。
+      </p>
+      <input type="file" id="excelFile" accept=".xlsx,.xls">
+      <div style="margin-top:10px;">
+        <button id="btnParseExcel" class="btn">讀取檔案</button>
+        <span id="excelStatus" class="hint"></span>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="excelPreviewPanel">
+      <h3>匯入預覽</h3>
+      <p id="excelSummary" class="hint"></p>
+      <div style="overflow-x:auto;">
+        <table class="deed-table wide">
+          <thead>
+            <tr><th>段小段</th><th>地號</th><th>共有人數</th></tr>
+          </thead>
+          <tbody id="excelParcelBody"></tbody>
+        </table>
+      </div>
+      <div style="margin-top:16px;">
+        <button id="btnConfirmImport" class="btn">確認匯入</button>
+        <button id="btnCancelImport" class="btn secondary">取消</button>
+        <span id="importStatus" class="hint"></span>
       </div>
     </div>
   </section>
@@ -113,10 +157,10 @@
       <div style="overflow-x:auto;">
         <table class="deed-table">
           <colgroup>
-            <col style="width:12%"><col style="width:38%"><col style="width:14%"><col style="width:14%"><col style="width:11%"><col style="width:11%">
+            <col style="width:8%"><col style="width:11%"><col style="width:33%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:12%">
           </colgroup>
           <thead>
-            <tr><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
+            <tr><th>登記次序</th><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
           </thead>
           <tbody id="ownerDetailBody"></tbody>
         </table>

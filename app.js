@@ -12,7 +12,6 @@ const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY,
 });
 
 let currentUser = null;
-let previewState = null; // 目前正在複核中的解析結果 { parcel, owners, file }
 
 // ---------- 登入 ----------
 
@@ -79,16 +78,19 @@ $("#navLogout").addEventListener("click", async () => {
 
 function showPage(name) {
   $("#pageUpload").classList.toggle("hidden", name !== "upload");
+  $("#pageImport").classList.toggle("hidden", name !== "import");
   $("#pageSearch").classList.toggle("hidden", name !== "search");
   $("#navUpload").classList.toggle("active", name === "upload");
+  $("#navImport").classList.toggle("active", name === "import");
   $("#navSearch").classList.toggle("active", name === "search");
   if (name === "search") refreshSearchPage();
 }
 
 $("#navUpload").addEventListener("click", () => showPage("upload"));
+$("#navImport").addEventListener("click", () => showPage("import"));
 $("#navSearch").addEventListener("click", () => showPage("search"));
 
-// ---------- 上傳與解析 ----------
+// ---------- 上傳與解析（支援一次多個檔案，依序解析，逐份核對存檔） ----------
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -100,32 +102,35 @@ function fileToBase64(file) {
 }
 
 $("#btnParse").addEventListener("click", async () => {
-  const fileInput = $("#deedFile");
-  const file = fileInput.files[0];
-  if (!file) {
-    $("#parseStatus").textContent = "請先選擇一個檔案";
+  const files = [...$("#deedFile").files];
+  if (files.length === 0) {
+    $("#parseStatus").textContent = "請先選擇檔案";
     return;
   }
-  $("#parseStatus").textContent = "解析中，請稍候（謄本共有人多的話可能要一點時間）…";
   $("#btnParse").disabled = true;
+  for (let i = 0; i < files.length; i++) {
+    $("#parseStatus").textContent = `解析中 (${i + 1}/${files.length})：${files[i].name}（謄本共有人多的話可能要一點時間）…`;
+    await parseOneFile(files[i]);
+  }
+  $("#parseStatus").textContent = files.length > 1 ? `${files.length} 份都解析完成，請逐一核對下方結果再存檔` : "解析完成，請核對下方內容";
+  $("#btnParse").disabled = false;
+  $("#deedFile").value = "";
+});
 
+async function parseOneFile(file) {
   try {
     const base64 = await fileToBase64(file);
     const { data, error } = await sb.functions.invoke("parse-deed", {
       body: { file_base64: base64, mime_type: file.type, filename: file.name },
     });
     if (error) throw error;
-
-    previewState = { parcel: data.parcel, owners: fillMissingShareAreas(data.parcel, data.owners), file };
-    renderPreview();
-    $("#parseStatus").textContent = "解析完成，請核對下方內容";
+    const owners = fillMissingShareAreas(data.parcel, data.owners);
+    await addPreviewCard(data.parcel, owners, file);
   } catch (err) {
     console.error(err);
-    $("#parseStatus").textContent = "解析失敗，請確認檔案格式或稍後再試";
-  } finally {
-    $("#btnParse").disabled = false;
+    addFailedCard(file, err);
   }
-});
+}
 
 // 謄本上不一定會直接印出「持分面積」，但這是可以算出來的：總面積 × (持分分子/持分分母)。
 // AI 解析沒抓到（留 null）時，用這個公式先幫忙算好，使用者核對時仍可手動修改。
@@ -142,64 +147,122 @@ function fillMissingShareAreas(parcel, owners) {
   });
 }
 
-function renderPreview() {
-  const { parcel, owners } = previewState;
-  $("#previewPanel").classList.remove("hidden");
-  $("#pv_section").value = parcel.section ?? "";
-  $("#pv_lot_no").value = parcel.lot_no ?? "";
-  $("#pv_area_sqm").value = parcel.area_sqm ?? "";
-  $("#pv_area_ping").value = parcel.area_ping ?? "";
-  $("#pv_land_use").value = parcel.land_use ?? "";
-  renderOwnersTable(owners);
+function blankOwner() {
+  return {
+    reg_sequence: null, name: "", address: "", share_numerator: null, share_denominator: null,
+    share_area_sqm: null, share_area_ping: null, reg_date: "", reg_reason: "", reason_date: "",
+  };
 }
 
-function renderOwnersTable(owners) {
-  const body = $("#pv_owners_body");
-  body.innerHTML = "";
-  owners.forEach((o, idx) => body.appendChild(ownerRow(o, idx)));
-  $("#pv_owner_count").textContent = owners.length;
+// 一份檔案一張卡片，用 class 選取（不能用 id，因為同一頁可能同時有好幾張卡片）
+async function addPreviewCard(parcel, owners, file) {
+  const tpl = $("#previewCardTemplate");
+  const frag = tpl.content.cloneNode(true);
+  const card = frag.querySelector(".preview-card");
+
+  card.querySelector(".pv-filename").textContent = file.name;
+  card.querySelector(".pv-section").value = parcel.section ?? "";
+  card.querySelector(".pv-lot_no").value = parcel.lot_no ?? "";
+  card.querySelector(".pv-area_sqm").value = parcel.area_sqm ?? "";
+  card.querySelector(".pv-area_ping").value = parcel.area_ping ?? "";
+  card.querySelector(".pv-land_use").value = parcel.land_use ?? "";
+
+  let ownersState = owners.slice();
+  const ownersBody = card.querySelector(".pv-owners-body");
+  const ownerCountEl = card.querySelector(".pv-owner-count");
+
+  function renderRows() {
+    ownersBody.innerHTML = "";
+    ownersState.forEach((o, idx) => ownersBody.appendChild(buildOwnerRow(o, idx, ownersState, renderRows)));
+    ownerCountEl.textContent = ownersState.length;
+  }
+  renderRows();
+
+  card.querySelector(".pv-add-row").addEventListener("click", () => {
+    ownersState.push(blankOwner());
+    renderRows();
+  });
+
+  card.querySelector(".pv-cancel").addEventListener("click", () => card.remove());
+
+  card.querySelector(".pv-confirm").addEventListener("click", async () => {
+    const statusEl = card.querySelector(".pv-savestatus");
+    const btn = card.querySelector(".pv-confirm");
+    statusEl.textContent = "存檔中…";
+    btn.disabled = true;
+    try {
+      const parcelPayload = {
+        section: card.querySelector(".pv-section").value.trim(),
+        lot_no: card.querySelector(".pv-lot_no").value.trim(),
+        area_sqm: card.querySelector(".pv-area_sqm").value ? Number(card.querySelector(".pv-area_sqm").value) : null,
+        area_ping: card.querySelector(".pv-area_ping").value ? Number(card.querySelector(".pv-area_ping").value) : null,
+        land_use: card.querySelector(".pv-land_use").value.trim() || null,
+      };
+      if (!parcelPayload.section || !parcelPayload.lot_no) {
+        throw new Error("段小段與地號為必填，請確認解析結果");
+      }
+      await saveDeed(parcelPayload, collectOwnersFromBody(ownersBody), file);
+      statusEl.textContent = "已存入總表";
+      btn.disabled = true;
+      card.querySelector(".pv-cancel").textContent = "關閉";
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "存檔失敗：" + (err.message || err);
+      btn.disabled = false;
+    }
+  });
+
+  // 這個地號如果之前已經存過共有人資料，先提醒一下：
+  // 登記次序相同的會自動更新覆蓋、不會產生重複，但還是讓使用者心裡有數。
+  if (parcel.section && parcel.lot_no) {
+    const { data: existing } = await sb
+      .from("parcel_overview")
+      .select("owner_count")
+      .eq("section", parcel.section)
+      .eq("lot_no", parcel.lot_no)
+      .maybeSingle();
+    if (existing && existing.owner_count > 0) {
+      const note = card.querySelector(".pv-existing-note");
+      note.textContent = `提醒：這個地號目前已存有 ${existing.owner_count} 筆共有人紀錄。登記次序相同的會自動更新覆蓋，不會產生重複；如果是全新的登記次序才會新增一筆。`;
+      note.classList.remove("hidden");
+    }
+  }
+
+  $("#previewList").prepend(card);
 }
 
-function ownerRow(o, idx) {
+function addFailedCard(file, err) {
+  const div = document.createElement("div");
+  div.className = "panel";
+  div.innerHTML = `<h3>${file.name}</h3><p class="hint" style="color:var(--danger);">解析失敗：${err.message || err}</p>`;
+  $("#previewList").prepend(div);
+}
+
+function buildOwnerRow(o, idx, ownersState, rerender) {
   const tr = document.createElement("tr");
-  tr.dataset.idx = idx;
   const fields = [
-    ["name", o.name], ["address", o.address],
+    ["reg_sequence", o.reg_sequence], ["name", o.name], ["address", o.address],
     ["share_numerator", o.share_numerator], ["share_denominator", o.share_denominator],
     ["share_area_sqm", o.share_area_sqm], ["share_area_ping", o.share_area_ping],
     ["reg_date", o.reg_date], ["reg_reason", o.reg_reason], ["reason_date", o.reason_date],
   ];
   tr.innerHTML = fields.map(([key, val]) =>
-    `<td><input type="text" data-key="${key}" value="${val ?? ""}" style="width:100%;border:none;"></td>`
-  ).join("") + `<td><button class="btn danger btnRemoveOwner" style="padding:4px 8px;">刪除</button></td>`;
-  tr.querySelector(".btnRemoveOwner").addEventListener("click", () => {
-    previewState.owners.splice(idx, 1);
-    renderOwnersTable(previewState.owners);
+    `<td><input type="text" data-key="${key}" value="${val ?? ""}"></td>`
+  ).join("") + `<td><button type="button" class="btn danger btn-remove-owner" style="padding:4px 8px;">刪除</button></td>`;
+  tr.querySelector(".btn-remove-owner").addEventListener("click", () => {
+    ownersState.splice(idx, 1);
+    rerender();
   });
   return tr;
 }
 
-$("#btnAddOwnerRow").addEventListener("click", () => {
-  previewState.owners.push({
-    name: "", address: "", share_numerator: null, share_denominator: null,
-    share_area_sqm: null, share_area_ping: null, reg_date: "", reg_reason: "", reason_date: "",
-  });
-  renderOwnersTable(previewState.owners);
-});
-
-$("#btnCancelPreview").addEventListener("click", () => {
-  previewState = null;
-  $("#previewPanel").classList.add("hidden");
-  $("#parseStatus").textContent = "";
-  $("#deedFile").value = "";
-});
-
-function collectOwnersFromTable() {
-  return [...$("#pv_owners_body").children].map((tr) => {
+function collectOwnersFromBody(body) {
+  const num = (v) => (v === "" ? null : Number(v));
+  const int = (v) => (v === "" ? null : parseInt(v, 10));
+  return [...body.children].map((tr) => {
     const get = (key) => tr.querySelector(`[data-key="${key}"]`).value;
-    const num = (v) => (v === "" ? null : Number(v));
-    const int = (v) => (v === "" ? null : parseInt(v, 10));
     return {
+      reg_sequence: int(get("reg_sequence")),
       name: get("name") || null,
       address: get("address") || null,
       share_numerator: int(get("share_numerator")),
@@ -213,73 +276,193 @@ function collectOwnersFromTable() {
   });
 }
 
-$("#btnConfirmSave").addEventListener("click", async () => {
-  $("#saveStatus").textContent = "存檔中…";
-  $("#btnConfirmSave").disabled = true;
-  try {
-    const parcelPayload = {
-      section: $("#pv_section").value.trim(),
-      lot_no: $("#pv_lot_no").value.trim(),
-      area_sqm: $("#pv_area_sqm").value ? Number($("#pv_area_sqm").value) : null,
-      area_ping: $("#pv_area_ping").value ? Number($("#pv_area_ping").value) : null,
-      land_use: $("#pv_land_use").value.trim() || null,
-    };
-    if (!parcelPayload.section || !parcelPayload.lot_no) {
-      throw new Error("段小段與地號為必填，請確認解析結果");
-    }
+// 實際存檔邏輯：地號主檔 upsert、原始檔存 Storage、建立謄本紀錄、共有人明細用「地號+登記次序」upsert
+// （登記次序相同 = 同一筆登記事件，重複上傳同一份謄本會自動覆蓋更新，不會產生重複的假共有人）
+async function saveDeed(parcelPayload, owners, file) {
+  const { data: parcelRow, error: parcelErr } = await sb
+    .from("parcels")
+    .upsert(parcelPayload, { onConflict: "section,lot_no" })
+    .select()
+    .single();
+  if (parcelErr) throw parcelErr;
 
-    // 1) upsert 地號主檔
-    const { data: parcelRow, error: parcelErr } = await sb
-      .from("parcels")
-      .upsert(parcelPayload, { onConflict: "section,lot_no" })
-      .select()
-      .single();
-    if (parcelErr) throw parcelErr;
+  // Supabase Storage 的路徑只能用英數字等安全字元，不能有中文，
+  // 所以資料夾用地號的 id（英數字），檔名只保留副檔名；中文原始檔名另外存在 documents.original_filename 顯示用。
+  const ext = (file.name.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "") || "bin";
+  const storagePath = `${parcelRow.id}/${Date.now()}.${ext}`;
+  const { error: uploadErr } = await sb.storage.from("deeds").upload(storagePath, file);
+  if (uploadErr) throw uploadErr;
 
-    // 2) 原始檔上傳到 Storage
-    // Supabase Storage 的路徑只能用英數字等安全字元，不能有中文，
-    // 所以資料夾用地號的 id（英數字），檔名只保留副檔名；中文原始檔名另外存在 documents.original_filename 顯示用。
-    const file = previewState.file;
-    const ext = (file.name.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "") || "bin";
-    const storagePath = `${parcelRow.id}/${Date.now()}.${ext}`;
-    const { error: uploadErr } = await sb.storage.from("deeds").upload(storagePath, file);
-    if (uploadErr) throw uploadErr;
-
-    // 3) 建立謄本紀錄
-    const { data: docRow, error: docErr } = await sb
-      .from("documents")
-      .insert({
-        parcel_id: parcelRow.id,
-        storage_path: storagePath,
-        original_filename: file.name,
-        uploaded_by: currentUser.id,
-        parse_status: "parsed",
-      })
-      .select()
-      .single();
-    if (docErr) throw docErr;
-
-    // 4) 寫入共有人明細（複核過的版本，取自表格目前的內容）
-    const owners = collectOwnersFromTable().map((o) => ({
-      ...o,
+  const { data: docRow, error: docErr } = await sb
+    .from("documents")
+    .insert({
       parcel_id: parcelRow.id,
-      document_id: docRow.id,
-    }));
-    if (owners.length > 0) {
-      const { error: ownersErr } = await sb.from("owners").insert(owners);
-      if (ownersErr) throw ownersErr;
+      storage_path: storagePath,
+      original_filename: file.name,
+      uploaded_by: currentUser.id,
+      parse_status: "parsed",
+    })
+    .select()
+    .single();
+  if (docErr) throw docErr;
+
+  if (owners.length > 0) {
+    const payload = owners.map((o) => ({ ...o, parcel_id: parcelRow.id, document_id: docRow.id }));
+    const { error: ownersErr } = await sb.from("owners").upsert(payload, { onConflict: "parcel_id,reg_sequence" });
+    if (ownersErr) throw ownersErr;
+  }
+}
+
+// ---------- Excel 匯入（把已經整理好的舊總表直接搬進來，不呼叫 AI） ----------
+
+const EXCEL_HEADER_MAP = {
+  "段小段": "section", "地號": "lot_no",
+  "面積(㎡)": "area_sqm", "面積（㎡）": "area_sqm", "面積(坪)": "area_ping", "面積（坪）": "area_ping",
+  "所有權人": "name", "持分分子": "share_numerator", "持分分母": "share_denominator",
+  "持分面積(㎡)": "share_area_sqm", "持分面積（㎡）": "share_area_sqm",
+  "持分面積(坪)": "share_area_ping", "持分面積（坪）": "share_area_ping",
+  "住址": "address", "登記日期": "reg_date", "登記原因": "reg_reason", "原因發生日期": "reason_date",
+  "登記次序": "reg_sequence",
+};
+
+let excelImportState = null; // { parcelMap: Map(key -> parcel payload), owners: [{..., _key}] }
+
+function toNum(v) {
+  const n = Number(v);
+  return v === "" || v == null || Number.isNaN(n) ? null : n;
+}
+function toInt(v) {
+  const n = parseInt(v, 10);
+  return v === "" || v == null || Number.isNaN(n) ? null : n;
+}
+
+$("#btnParseExcel").addEventListener("click", async () => {
+  const file = $("#excelFile").files[0];
+  if (!file) {
+    $("#excelStatus").textContent = "請先選擇檔案";
+    return;
+  }
+  $("#excelStatus").textContent = "讀取中…";
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" });
+
+    // Excel 的欄位標題不一定在第一列（例如上面留了說明列），往下找幾列去比對欄名
+    let headerRowIdx = -1;
+    let colMap = {};
+    for (let i = 0; i < Math.min(rows.length, 15); i++) {
+      const cells = rows[i].map((c) => String(c ?? "").trim());
+      const map = {};
+      cells.forEach((label, colIdx) => {
+        if (EXCEL_HEADER_MAP[label]) map[EXCEL_HEADER_MAP[label]] = colIdx;
+      });
+      if (map.name != null && map.lot_no != null) {
+        headerRowIdx = i;
+        colMap = map;
+        break;
+      }
+    }
+    if (headerRowIdx === -1) {
+      throw new Error("找不到欄位標題列，請確認欄名跟說明一致（例如「所有權人」「地號」）");
     }
 
-    $("#saveStatus").textContent = "已存入總表";
-    previewState = null;
-    $("#previewPanel").classList.add("hidden");
-    $("#deedFile").value = "";
-    $("#parseStatus").textContent = "";
+    const parcelMap = new Map();
+    const owners = [];
+    for (let i = headerRowIdx + 1; i < rows.length; i++) {
+      const row = rows[i];
+      const get = (field) => (colMap[field] != null ? row[colMap[field]] : undefined);
+      const section = String(get("section") ?? "").trim();
+      const lotNo = String(get("lot_no") ?? "").trim();
+      const name = String(get("name") ?? "").trim();
+      if (!section && !lotNo && !name) continue; // 空白列跳過
+      if (!section || !lotNo) continue; // 沒有地號資訊的列跳過
+
+      const key = `${section}|${lotNo}`;
+      if (!parcelMap.has(key)) {
+        parcelMap.set(key, {
+          section, lot_no: lotNo,
+          area_sqm: toNum(get("area_sqm")), area_ping: toNum(get("area_ping")),
+          land_use: null,
+        });
+      }
+      owners.push({
+        _key: key,
+        reg_sequence: toInt(get("reg_sequence")),
+        name: name || null,
+        address: String(get("address") ?? "").trim() || null,
+        share_numerator: toInt(get("share_numerator")),
+        share_denominator: toInt(get("share_denominator")),
+        share_area_sqm: toNum(get("share_area_sqm")),
+        share_area_ping: toNum(get("share_area_ping")),
+        reg_date: String(get("reg_date") ?? "").trim() || null,
+        reg_reason: String(get("reg_reason") ?? "").trim() || null,
+        reason_date: String(get("reason_date") ?? "").trim() || null,
+      });
+    }
+
+    if (owners.length === 0) throw new Error("沒有讀到任何共有人資料列，請確認檔案內容");
+
+    excelImportState = { parcelMap, owners };
+    renderExcelPreview();
+    $("#excelStatus").textContent = "讀取完成，請確認下方預覽";
   } catch (err) {
     console.error(err);
-    $("#saveStatus").textContent = "存檔失敗：" + (err.message || err);
-  } finally {
-    $("#btnConfirmSave").disabled = false;
+    $("#excelStatus").textContent = "讀取失敗：" + (err.message || err);
+  }
+});
+
+function renderExcelPreview() {
+  const { parcelMap, owners } = excelImportState;
+  $("#excelPreviewPanel").classList.remove("hidden");
+  $("#excelSummary").textContent = `偵測到 ${parcelMap.size} 筆地號，共 ${owners.length} 位共有人紀錄。確認無誤後按「確認匯入」寫入資料庫（不會呼叫 AI，也不會產生費用）。`;
+  const body = $("#excelParcelBody");
+  body.innerHTML = "";
+  for (const [key, p] of parcelMap) {
+    const count = owners.filter((o) => o._key === key).length;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${p.section}</td><td>${p.lot_no}</td><td>${count}</td>`;
+    body.appendChild(tr);
+  }
+}
+
+$("#btnCancelImport").addEventListener("click", () => {
+  excelImportState = null;
+  $("#excelPreviewPanel").classList.add("hidden");
+  $("#excelFile").value = "";
+  $("#excelStatus").textContent = "";
+});
+
+$("#btnConfirmImport").addEventListener("click", async () => {
+  if (!excelImportState) return;
+  $("#importStatus").textContent = "匯入中…";
+  $("#btnConfirmImport").disabled = true;
+  try {
+    const { parcelMap, owners } = excelImportState;
+    const parcelIdByKey = new Map();
+    for (const [key, payload] of parcelMap) {
+      const { data, error } = await sb.from("parcels").upsert(payload, { onConflict: "section,lot_no" }).select().single();
+      if (error) throw error;
+      parcelIdByKey.set(key, data.id);
+    }
+
+    const ownerPayload = owners.map(({ _key, ...rest }) => ({
+      ...rest, parcel_id: parcelIdByKey.get(_key), document_id: null,
+    }));
+
+    const chunkSize = 500; // 分批寫入，避免一次送出太多筆
+    for (let i = 0; i < ownerPayload.length; i += chunkSize) {
+      const chunk = ownerPayload.slice(i, i + chunkSize);
+      const { error } = await sb.from("owners").upsert(chunk, { onConflict: "parcel_id,reg_sequence" });
+      if (error) throw error;
+    }
+
+    $("#importStatus").textContent = `匯入完成：${parcelMap.size} 筆地號、${owners.length} 位共有人。`;
+  } catch (err) {
+    console.error(err);
+    $("#importStatus").textContent = "匯入失敗：" + (err.message || err);
+    $("#btnConfirmImport").disabled = false;
   }
 });
 
@@ -349,6 +532,7 @@ async function showParcelDetail(parcel) {
     .from("owners")
     .select("*")
     .eq("parcel_id", parcel.id)
+    .order("reg_sequence", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
   const body = $("#ownerDetailBody");
@@ -356,7 +540,7 @@ async function showParcelDetail(parcel) {
   (owners || []).forEach((o) => {
     const share = o.share_numerator && o.share_denominator ? `${o.share_numerator}/${o.share_denominator}` : "";
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${o.name ?? ""}</td><td>${o.address ?? ""}</td><td>${share}</td><td>${o.share_area_ping ?? ""}</td><td>${o.reg_date ?? ""}</td><td>${o.reg_reason ?? ""}</td>`;
+    tr.innerHTML = `<td>${o.reg_sequence ?? ""}</td><td>${o.name ?? ""}</td><td>${o.address ?? ""}</td><td>${share}</td><td>${o.share_area_ping ?? ""}</td><td>${o.reg_date ?? ""}</td><td>${o.reg_reason ?? ""}</td>`;
     body.appendChild(tr);
   });
 

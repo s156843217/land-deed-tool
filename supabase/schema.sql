@@ -60,10 +60,15 @@ alter table documents enable row level security;
 create policy p_documents_all on documents for all to authenticated using (true) with check (true);
 
 -- owners：共有人明細，一個共有人一列，掛在對應地號底下
+-- reg_sequence（登記次序）是謄本所有權部裡每筆登記事件的流水號，同一地號內遞增且唯一，
+-- 所有權換手一定會產生新號碼——拿來當「同一地號+同一登記次序=同一筆登記」的天然防重複依據，
+-- 重複上傳同一份謄本會 upsert 覆蓋掉同一筆，不會產生看起來像共有人變多的假重複。
+-- AI 解析不到（例如舊 Excel 匯入沒有這欄）就留 null，null 彼此不會被當作衝突，一律當新資料插入。
 create table owners (
   id uuid primary key default gen_random_uuid(),
   parcel_id uuid not null references parcels(id) on delete cascade,
   document_id uuid references documents(id) on delete set null,
+  reg_sequence integer,        -- 登記次序，同地號內的唯一流水號
   name text,                   -- 所有權人姓名
   address text,                -- 住址
   share_numerator bigint,      -- 持分分子
@@ -73,7 +78,8 @@ create table owners (
   reg_date text,               -- 登記日期（原文民國年格式，例如 068/07/31，不轉換以免失真）
   reg_reason text,             -- 登記原因，例如「繼承」
   reason_date text,            -- 原因發生日期（同樣保留原文格式）
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (parcel_id, reg_sequence)
 );
 
 alter table owners enable row level security;
