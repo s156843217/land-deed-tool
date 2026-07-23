@@ -6,6 +6,18 @@
 
 const $ = (s) => document.querySelector(s);
 
+// 批次刪除按鈕：沒有勾選任何一列時就先不出現，避免畫面一直放著一顆隨時可能誤按的紅色按鈕。
+// 用事件代理監聽整個文件的 change，因為勾選框都是動態產生的列，不用每一列各自綁一次。
+function refreshBulkButton(checkboxSelector, buttonSelector) {
+  const anyChecked = document.querySelectorAll(`${checkboxSelector}:checked`).length > 0;
+  $(buttonSelector).classList.toggle("hidden", !anyChecked);
+}
+document.addEventListener("change", (e) => {
+  if (e.target.matches(".parcel-select, #parcelSelectAll")) refreshBulkButton(".parcel-select", "#btnDeleteParcels");
+  if (e.target.matches(".owner-select, #ownerSelectAll")) refreshBulkButton(".owner-select", "#btnDeleteOwners");
+  if (e.target.matches(".doc-select, #docSelectAll")) refreshBulkButton(".doc-select", "#btnDeleteDocs");
+});
+
 const cfg = window.LAND_DEED_CONFIG;
 const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, storage: window.localStorage },
@@ -557,6 +569,7 @@ function renderParcelList(parcels) {
   body.innerHTML = "";
   $("#parcelSelectAll").checked = false;
   $("#deleteParcelsStatus").textContent = "";
+  $("#btnDeleteParcels").classList.add("hidden");
   parcels.forEach((p) => {
     const tr = document.createElement("tr");
     tr.className = "parcel-row";
@@ -614,6 +627,7 @@ async function showParcelDetail(parcel) {
   $("#parcelDetailTitle").textContent = `${parcel.section} ${parcel.lot_no} 地號 — 共有人明細`;
   $("#ownerSelectAll").checked = false;
   $("#deleteOwnersStatus").textContent = "";
+  $("#btnDeleteOwners").classList.add("hidden");
 
   const { data: owners } = await sb
     .from("owners")
@@ -634,6 +648,7 @@ async function showParcelDetail(parcel) {
 
   $("#docSelectAll").checked = false;
   $("#deleteDocsStatus").textContent = "";
+  $("#btnDeleteDocs").classList.add("hidden");
   const list = $("#documentList");
   list.innerHTML = "";
   for (const doc of docs || []) {

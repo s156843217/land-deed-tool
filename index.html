@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>土地謄本管理工具</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -154,7 +154,7 @@
         </table>
       </div>
       <div style="margin-top:10px;">
-        <button id="btnDeleteParcels" class="btn danger">刪除勾選的地號（連同共有人明細與謄本檔案）</button>
+        <button id="btnDeleteParcels" class="btn danger hidden">刪除勾選的地號（連同共有人明細與謄本檔案）</button>
         <span id="deleteParcelsStatus" class="hint"></span>
       </div>
     </div>
@@ -178,14 +178,14 @@
         </table>
       </div>
       <div style="margin:10px 0;">
-        <button id="btnDeleteOwners" class="btn danger">刪除勾選的共有人紀錄</button>
+        <button id="btnDeleteOwners" class="btn danger hidden">刪除勾選的共有人紀錄</button>
         <span id="deleteOwnersStatus" class="hint"></span>
       </div>
 
       <h4>相關謄本原始檔　<label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" id="docSelectAll"> 全選</label></h4>
       <ul id="documentList"></ul>
       <div style="margin:10px 0;">
-        <button id="btnDeleteDocs" class="btn danger">刪除勾選的謄本檔案</button>
+        <button id="btnDeleteDocs" class="btn danger hidden">刪除勾選的謄本檔案</button>
         <span id="deleteDocsStatus" class="hint"></span>
       </div>
 
@@ -198,6 +198,6 @@
 </main>
 
 <script src="config.js"></script>
-<script src="app.js?v=7"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
