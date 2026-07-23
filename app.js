@@ -642,3 +642,34 @@ $("#btnDeleteOwners").addEventListener("click", async () => {
   await runSearch($("#searchInput").value.trim()); // 讓地號總覽的共有人數同步更新
   $("#deleteOwnersStatus").textContent = `已刪除 ${ids.length} 筆`;
 });
+
+// 刪除整個地號：連同底下所有共有人明細、謄本原始檔(含 Storage 檔案)一起清掉，跳確認對話框避免手滑
+$("#btnDeleteParcel").addEventListener("click", async () => {
+  if (!currentDetailParcel) return;
+  const p = currentDetailParcel;
+  const ok = window.confirm(
+    `確定要刪除「${p.section} ${p.lot_no}」整個地號嗎？\n底下所有共有人紀錄跟謄本原始檔都會一併刪除，此動作無法復原。`
+  );
+  if (!ok) return;
+
+  $("#deleteParcelStatus").textContent = "刪除中…";
+  try {
+    const { data: docs } = await sb.from("documents").select("storage_path").eq("parcel_id", p.id);
+    const paths = (docs || []).map((d) => d.storage_path);
+    if (paths.length > 0) await sb.storage.from("deeds").remove(paths);
+
+    const { error: docsErr } = await sb.from("documents").delete().eq("parcel_id", p.id);
+    if (docsErr) throw docsErr;
+
+    // owners 是 on delete cascade，刪 parcels 這一列會自動一起刪掉底下的共有人明細
+    const { error: parcelErr } = await sb.from("parcels").delete().eq("id", p.id);
+    if (parcelErr) throw parcelErr;
+
+    currentDetailParcel = null;
+    $("#parcelDetailPanel").classList.add("hidden");
+    await runSearch($("#searchInput").value.trim());
+  } catch (err) {
+    console.error(err);
+    $("#deleteParcelStatus").textContent = "刪除失敗：" + (err.message || err);
+  }
+});
