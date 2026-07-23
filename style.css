@@ -1,0 +1,157 @@
+:root {
+  --primary: #5c7a52;      /* 大地綠，土地開發主題色 */
+  --primary-dark: #3f5a38;
+  --bg: #f7f5f0;            /* 米白背景 */
+  --card: #ffffff;
+  --border: #ddd7c9;
+  --text: #2b2a26;
+  --text-muted: #6b6a63;
+  --danger: #b3452c;
+  --sans: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  --serif: "Noto Serif TC", serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+}
+
+header.site-header {
+  background: var(--primary-dark);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header.site-header h1 {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+  margin: 0;
+}
+
+nav.site-nav {
+  display: flex;
+  gap: 8px;
+}
+
+nav.site-nav button {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.4);
+  color: #fff;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+nav.site-nav button.active {
+  background: #fff;
+  color: var(--primary-dark);
+  font-weight: bold;
+}
+
+main {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 0 16px 60px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.btn:hover { background: var(--primary-dark); }
+
+.btn.secondary {
+  background: transparent;
+  color: var(--primary-dark);
+  border: 1px solid var(--primary);
+}
+
+.btn.danger { background: var(--danger); }
+
+input[type="text"], input[type="email"], input[type="password"], input[type="number"], input[type="file"] {
+  font-family: var(--sans);
+  font-size: 0.95rem;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  width: 100%;
+}
+
+table.deed-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+table.deed-table th, table.deed-table td {
+  border: 1px solid var(--border);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+table.deed-table th {
+  background: #efece3;
+}
+
+.parcel-row {
+  cursor: pointer;
+}
+
+.parcel-row:hover {
+  background: #efece3;
+}
+
+#loginOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(43,42,38,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+#loginOverlay .panel {
+  width: 320px;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.hidden { display: none !important; }

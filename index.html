@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>土地謄本管理工具</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+<div id="loginOverlay">
+  <div class="panel">
+    <h2>登入</h2>
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginEmail">Email</label>
+        <input type="email" id="loginEmail" required autocomplete="username">
+      </div>
+      <div class="field">
+        <label for="loginPassword">密碼</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password">
+      </div>
+      <div id="loginError" class="hint" style="color:var(--danger);"></div>
+      <button type="submit" class="btn" style="width:100%;margin-top:8px;">登入</button>
+    </form>
+  </div>
+</div>
+
+<header class="site-header">
+  <h1>土地謄本管理工具</h1>
+  <nav class="site-nav">
+    <button id="navUpload" class="active">上傳謄本</button>
+    <button id="navSearch">總表查詢</button>
+    <button id="navLogout" title="登出">登出</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- 上傳頁 -->
+  <section id="pageUpload">
+    <div class="panel">
+      <h2>上傳謄本</h2>
+      <p class="hint">支援電子謄本 PDF，或紙本掃描/照片（JPG、PNG）。上傳後會用 AI 解析，解析完請務必核對過再送出存檔。</p>
+      <input type="file" id="deedFile" accept="application/pdf,image/*">
+      <div style="margin-top:10px;">
+        <button id="btnParse" class="btn">開始解析</button>
+        <span id="parseStatus" class="hint"></span>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="previewPanel">
+      <h2>解析結果（請核對後再送出）</h2>
+
+      <h3>地號資訊</h3>
+      <div class="field"><label>段小段</label><input type="text" id="pv_section"></div>
+      <div class="field"><label>地號</label><input type="text" id="pv_lot_no"></div>
+      <div class="field"><label>總面積（㎡）</label><input type="number" id="pv_area_sqm" step="any"></div>
+      <div class="field"><label>總面積（坪）</label><input type="number" id="pv_area_ping" step="any"></div>
+      <div class="field"><label>地目 / 使用分區</label><input type="text" id="pv_land_use"></div>
+
+      <h3>共有人明細（<span id="pv_owner_count">0</span> 人）</h3>
+      <div style="overflow-x:auto;">
+        <table class="deed-table" id="pv_owners_table">
+          <thead>
+            <tr>
+              <th>姓名</th><th>住址</th><th>持分分子</th><th>持分分母</th>
+              <th>持分面積㎡</th><th>持分面積坪</th><th>登記日期</th><th>登記原因</th><th>原因發生日期</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="pv_owners_body"></tbody>
+        </table>
+      </div>
+      <button id="btnAddOwnerRow" class="btn secondary" style="margin-top:8px;">＋新增一列</button>
+
+      <div style="margin-top:16px;">
+        <button id="btnConfirmSave" class="btn">確認無誤，存入總表</button>
+        <button id="btnCancelPreview" class="btn secondary">取消</button>
+        <span id="saveStatus" class="hint"></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 查詢頁 -->
+  <section id="pageSearch" class="hidden">
+    <div class="panel">
+      <h2>總表查詢</h2>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="searchInput" placeholder="輸入段小段、地號、所有權人姓名或地址關鍵字">
+        <button id="btnSearch" class="btn">查詢</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>地號總覽</h3>
+      <div style="overflow-x:auto;">
+        <table class="deed-table">
+          <thead>
+            <tr><th>段小段</th><th>地號</th><th>總面積(坪)</th><th>共有人數</th><th>地目/使用分區</th></tr>
+          </thead>
+          <tbody id="parcelListBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="parcelDetailPanel">
+      <h3 id="parcelDetailTitle">地號明細</h3>
+      <div style="overflow-x:auto;">
+        <table class="deed-table">
+          <thead>
+            <tr><th>姓名</th><th>住址</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
+          </thead>
+          <tbody id="ownerDetailBody"></tbody>
+        </table>
+      </div>
+      <h4>相關謄本原始檔</h4>
+      <ul id="documentList"></ul>
+    </div>
+  </section>
+
+</main>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
