@@ -114,11 +114,12 @@ table.deed-table {
 
 /* 欄位較多的表格（例如共有人逐筆編輯表）在窄螢幕上不硬擠成一團，
    改成保留每欄可讀寬度、讓外層 overflow-x:auto 的容器負責左右滑動。
-   注意：table-layout:fixed 搭配 width:auto 在手機瀏覽器上不會乖乖照 colgroup
-   的像素寬度撐開（會被硬壓縮成貼合容器寬度），要用 width:max-content 才會
-   真的照 colgroup 總和撐開，配合外層 overflow-x:auto 才滑得動。 */
+   注意：table-layout:fixed 搭配 width:auto 或 max-content 在不同瀏覽器
+   （尤其手機 Safari）表現不一致，容易被硬壓縮成貼合容器寬度而看不出內容，
+   改成直接寫死明確的 px 寬度最可靠，不要依賴瀏覽器自己去算。
+   目前 pv_owners_table 的 colgroup 總和是 990px，之後改欄位要記得同步調整。 */
 table.deed-table.wide {
-  width: max-content;
+  width: 990px;
   max-width: none;
 }
 

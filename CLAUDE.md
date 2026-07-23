@@ -23,6 +23,7 @@
   - 免費額度是「每個型號」各自獨立的每日配額（實測 gemini-2.5-flash 一天只有 20 次），`parse-deed/index.ts` 的 `GEMINI_MODELS` 是依序嘗試的備援清單，遇到 429 額度用完會自動換下一個型號，不是 bug；如果全部型號都額度用完，要嘛等隔天重置，要嘛去 aistudio.google.com 查目前還有額度的型號並加進清單。
   - 前端 UI 文案一律用中性字眼「AI 解析」，不要寫死「Gemini」或「Claude」——之後要換模型只改 `parse-deed/index.ts` 這一個檔案，UI 文案不用跟著改，避免重蹈 `rental-mgmt` 文案跟實際模型脫鉤的覆轍。
 - **部署**：GitHub 公開 repo + GitHub Pages，push `main` 自動上線（跟 linkou-crm/rental-mgmt 一致）。程式碼本身不含任何個資，真實資料都在 Supabase 後面靠登入保護。
+- **⚠ 改 `style.css`／`app.js` 後，`index.html` 裡引用它們的 `?v=` 版本號一定要跟著進位**（例如 `style.css?v=2` → `?v=3`），否則手機瀏覽器（尤其 Safari）常常會一直吃舊快取，使用者一般重新整理也看不到新版本，會誤以為改的東西沒生效——這個雷已經在 2026-07-23 踩過一次，畫面明明改了好幾次手機端卻完全沒變化，最後才發現是快取沒有被強制更新。
 
 ## 3. 本 repo 專屬紅線
 
