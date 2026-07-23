@@ -101,6 +101,7 @@ function showPage(name) {
 $("#navUpload").addEventListener("click", () => showPage("upload"));
 $("#navImport").addEventListener("click", () => showPage("import"));
 $("#navSearch").addEventListener("click", () => showPage("search"));
+$("#siteTitle").addEventListener("click", () => showPage("search"));
 
 // ---------- 上傳與解析（支援一次多個檔案，依序解析，逐份核對存檔） ----------
 

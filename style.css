@@ -39,6 +39,7 @@ header.site-header h1 {
   font-family: var(--serif);
   font-size: 1.3rem;
   margin: 0;
+  cursor: pointer;
 }
 
 nav.site-nav {
