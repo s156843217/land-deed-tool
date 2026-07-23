@@ -42,9 +42,9 @@
 
   <!-- 上傳頁 -->
   <section id="pageUpload">
-    <div class="panel">
+    <div class="panel" id="uploadDropZone">
       <h2>上傳謄本</h2>
-      <p class="hint">支援電子謄本 PDF，或紙本掃描/照片（JPG、PNG），可一次選多個檔案批次上傳。上傳後會依序用 AI 解析，每一份都務必核對過再各自送出存檔。</p>
+      <p class="hint">支援電子謄本 PDF，或紙本掃描/照片（JPG、PNG），可一次選多個檔案批次上傳，也可以直接把檔案拖拉到這個框裡。上傳後會依序用 AI 解析，每一份都務必核對過再各自送出存檔。</p>
       <input type="file" id="deedFile" accept="application/pdf,image/*" multiple>
       <div style="margin-top:10px;">
         <button id="btnParse" class="btn">開始解析</button>

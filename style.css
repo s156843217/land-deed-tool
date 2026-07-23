@@ -178,6 +178,12 @@ table.deed-table th {
 
 .hidden { display: none !important; }
 
+#uploadDropZone.drag-over {
+  outline: 2px dashed var(--primary);
+  outline-offset: -4px;
+  background: #eef2ea;
+}
+
 @media (max-width: 640px) {
   header.site-header {
     flex-direction: column;

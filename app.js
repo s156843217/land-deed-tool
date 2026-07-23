@@ -101,6 +101,29 @@ function fileToBase64(file) {
   });
 }
 
+// 拖拉檔案到上傳框：一般 <input type="file"> 也吃拖放，但目標範圍太小很難丟中，
+// 這裡讓整個框都能接住拖放的檔案，體驗跟點「選擇檔案」一致。
+const dropZone = $("#uploadDropZone");
+["dragenter", "dragover"].forEach((evt) =>
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.add("drag-over");
+  })
+);
+["dragleave", "drop"].forEach((evt) =>
+  dropZone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("drag-over");
+  })
+);
+dropZone.addEventListener("drop", (e) => {
+  const dropped = e.dataTransfer?.files;
+  if (dropped && dropped.length > 0) {
+    $("#deedFile").files = dropped;
+    $("#parseStatus").textContent = `已選取 ${dropped.length} 個檔案，可按「開始解析」`;
+  }
+});
+
 $("#btnParse").addEventListener("click", async () => {
   const files = [...$("#deedFile").files];
   if (files.length === 0) {
@@ -128,8 +151,24 @@ async function parseOneFile(file) {
     await addPreviewCard(data.parcel, owners, file);
   } catch (err) {
     console.error(err);
-    addFailedCard(file, err);
+    const message = await describeFunctionError(err);
+    addFailedCard(file, message);
   }
+}
+
+// sb.functions.invoke() 在 Edge Function 回傳非 2xx 時，err.message 只會是很籠統的
+// "Edge Function returned a non-2xx status code"，真正的原因在 err.context 這個 Response 裡，
+// 要另外讀出來才看得到（例如 Gemini 額度用完、輸出被截斷等實際訊息）。
+async function describeFunctionError(err) {
+  try {
+    if (err?.context && typeof err.context.json === "function") {
+      const body = await err.context.json();
+      if (body?.error) return body.error;
+    }
+  } catch (_) {
+    // 讀不到詳細內容就退回下面的籠統訊息
+  }
+  return err?.message || String(err);
 }
 
 // 謄本上不一定會直接印出「持分面積」，但這是可以算出來的：總面積 × (持分分子/持分分母)。
@@ -231,10 +270,10 @@ async function addPreviewCard(parcel, owners, file) {
   $("#previewList").prepend(card);
 }
 
-function addFailedCard(file, err) {
+function addFailedCard(file, message) {
   const div = document.createElement("div");
   div.className = "panel";
-  div.innerHTML = `<h3>${file.name}</h3><p class="hint" style="color:var(--danger);">解析失敗：${err.message || err}</p>`;
+  div.innerHTML = `<h3>${file.name}</h3><p class="hint" style="color:var(--danger);">解析失敗：${message}</p>`;
   $("#previewList").prepend(div);
 }
 
