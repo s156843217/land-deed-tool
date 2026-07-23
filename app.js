@@ -116,7 +116,7 @@ $("#btnParse").addEventListener("click", async () => {
     });
     if (error) throw error;
 
-    previewState = { parcel: data.parcel, owners: data.owners, file };
+    previewState = { parcel: data.parcel, owners: fillMissingShareAreas(data.parcel, data.owners), file };
     renderPreview();
     $("#parseStatus").textContent = "解析完成，請核對下方內容";
   } catch (err) {
@@ -126,6 +126,21 @@ $("#btnParse").addEventListener("click", async () => {
     $("#btnParse").disabled = false;
   }
 });
+
+// 謄本上不一定會直接印出「持分面積」，但這是可以算出來的：總面積 × (持分分子/持分分母)。
+// AI 解析沒抓到（留 null）時，用這個公式先幫忙算好，使用者核對時仍可手動修改。
+function fillMissingShareAreas(parcel, owners) {
+  const round2 = (n) => Math.round(n * 100) / 100;
+  return owners.map((o) => {
+    if (o.share_numerator == null || o.share_denominator == null || o.share_denominator === 0) return o;
+    const ratio = o.share_numerator / o.share_denominator;
+    return {
+      ...o,
+      share_area_sqm: o.share_area_sqm ?? (parcel.area_sqm != null ? round2(parcel.area_sqm * ratio) : null),
+      share_area_ping: o.share_area_ping ?? (parcel.area_ping != null ? round2(parcel.area_ping * ratio) : null),
+    };
+  });
+}
 
 function renderPreview() {
   const { parcel, owners } = previewState;
