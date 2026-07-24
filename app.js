@@ -73,13 +73,21 @@ function hideLogin() {
   $("#loginError").textContent = "";
 }
 
+// 記住上次登入用的 email，下次打開只需要輸入密碼即可（純前端存在瀏覽器本機，不是帳密本身）
+const LAST_EMAIL_KEY = "landDeedTool.lastEmail";
+$("#loginEmail").value = localStorage.getItem(LAST_EMAIL_KEY) || "";
+
 $("#loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#loginError").textContent = "";
   const email = $("#loginEmail").value.trim();
   const password = $("#loginPassword").value;
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) $("#loginError").textContent = "登入失敗：帳號或密碼錯誤";
+  if (error) {
+    $("#loginError").textContent = "登入失敗：帳號或密碼錯誤";
+  } else {
+    localStorage.setItem(LAST_EMAIL_KEY, email);
+  }
 });
 
 $("#navLogout").addEventListener("click", async () => {
