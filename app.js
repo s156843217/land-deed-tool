@@ -621,6 +621,7 @@ $("#btnDeleteParcels").addEventListener("click", async () => {
 });
 
 let currentDetailParcel = null;
+let currentDetailOwners = []; // 列印/匯出用，跟畫面上表格資料保持同一份，不用另外重讀 DOM
 
 async function showParcelDetail(parcel) {
   currentDetailParcel = parcel;
@@ -637,9 +638,10 @@ async function showParcelDetail(parcel) {
     .order("reg_sequence", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
+  currentDetailOwners = owners || [];
   const body = $("#ownerDetailBody");
   body.innerHTML = "";
-  (owners || []).forEach((o) => body.appendChild(buildOwnerDetailRow(o)));
+  currentDetailOwners.forEach((o) => body.appendChild(buildOwnerDetailRow(o)));
 
   const { data: docs } = await sb
     .from("documents")
@@ -661,6 +663,75 @@ async function showParcelDetail(parcel) {
     li.innerHTML = `<input type="checkbox" class="doc-select" data-id="${doc.id}" data-path="${doc.storage_path}"> ${linkHtml}（上傳於 ${new Date(doc.uploaded_at).toLocaleString("zh-TW")}）`;
     list.appendChild(li);
   }
+}
+
+// ---------- 單一地號明細：列印／匯出 Excel／匯出 Word ----------
+// 三個按鈕都只處理「目前開啟中的地號」(currentDetailParcel + currentDetailOwners)，
+// 資料來源跟畫面上表格同一份，不用另外重讀 DOM 或重查資料庫。
+
+$("#btnPrintParcel").addEventListener("click", () => {
+  window.print(); // 版面靠 style.css 的 @media print 規則只留 #parcelDetailPanel
+});
+
+// 欄位標題比照 EXCEL_HEADER_MAP，匯出的檔案可以直接用「Excel 匯入」頁再讀回來，跟既有匯入邏輯對稱
+function ownerRowsForExport() {
+  const p = currentDetailParcel;
+  return currentDetailOwners.map((o) => ({
+    "段小段": p.section,
+    "地號": p.lot_no,
+    "登記次序": o.reg_sequence ?? "",
+    "所有權人": o.name ?? "",
+    "住址": o.address ?? "",
+    "聯絡電話": o.phone ?? "",
+    "持分分子": o.share_numerator ?? "",
+    "持分分母": o.share_denominator ?? "",
+    "持分面積(坪)": o.share_area_ping ?? "",
+    "登記日期": o.reg_date ?? "",
+    "登記原因": o.reg_reason ?? "",
+    "原因發生日期": o.reason_date ?? "",
+  }));
+}
+
+$("#btnExportExcel").addEventListener("click", () => {
+  const p = currentDetailParcel;
+  if (!p) return;
+  const ws = XLSX.utils.json_to_sheet(ownerRowsForExport());
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "共有人明細");
+  XLSX.writeFile(wb, `${p.section}${p.lot_no}地號_共有人明細.xlsx`);
+});
+
+$("#btnExportWord").addEventListener("click", () => {
+  const p = currentDetailParcel;
+  if (!p) return;
+  const rows = ownerRowsForExport();
+  const headers = rows.length > 0 ? Object.keys(rows[0]) : [];
+  const theadHtml = `<tr>${headers.map((h) => `<th style="border:1px solid #999;padding:4px 8px;background:#eee;">${h}</th>`).join("")}</tr>`;
+  const rowsHtml = rows
+    .map((r) => `<tr>${headers.map((h) => `<td style="border:1px solid #999;padding:4px 8px;">${r[h]}</td>`).join("")}</tr>`)
+    .join("");
+  const html = `
+    <h2>${p.section} ${p.lot_no} 地號 — 共有人明細</h2>
+    <p>總面積：${p.area_ping ?? ""} 坪　地目/使用分區：${p.land_use ?? ""}</p>
+    <table style="border-collapse:collapse;">${theadHtml}${rowsHtml}</table>
+  `;
+  downloadAsWordDoc(`${p.section}${p.lot_no}地號_共有人明細.doc`, html);
+});
+
+// 用「HTML 包成 .doc」的方式匯出 Word，不需要額外的套件，Word 開啟時會自動辨識成文件
+function downloadAsWordDoc(filename, bodyHtml) {
+  const html =
+    `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>` +
+    `<head><meta charset="utf-8"></head><body>${bodyHtml}</body></html>`;
+  const blob = new Blob(["﻿", html], { type: "application/msword" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // 共有人明細一列：姓名/住址/聯絡電話可以直接編輯，改完按「儲存」才會真的寫回資料庫，

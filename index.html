@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>土地謄本管理工具</title>
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=10">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -161,7 +161,12 @@
 
     <div class="panel hidden" id="parcelDetailPanel">
       <h3 id="parcelDetailTitle">地號明細</h3>
-      <p class="hint">姓名、住址、聯絡電話可以直接改，改完按該列的「儲存」即可（例如後來查到本名或拿到電話）。</p>
+      <div class="no-print" style="display:flex; gap:8px; margin-bottom:10px;">
+        <button id="btnPrintParcel" class="btn secondary">列印</button>
+        <button id="btnExportExcel" class="btn secondary">匯出 Excel</button>
+        <button id="btnExportWord" class="btn secondary">匯出 Word</button>
+      </div>
+      <p class="hint no-print">姓名、住址、聯絡電話可以直接改，改完按該列的「儲存」即可（例如後來查到本名或拿到電話）。</p>
       <div style="overflow-x:auto;">
         <table class="deed-table wide" id="ownerDetailTable" style="width:886px;">
           <colgroup>
@@ -177,27 +182,27 @@
           <tbody id="ownerDetailBody"></tbody>
         </table>
       </div>
-      <div style="margin:10px 0;">
+      <div class="no-print" style="margin:10px 0;">
         <button id="btnDeleteOwners" class="btn danger hidden">刪除勾選的共有人紀錄</button>
         <span id="deleteOwnersStatus" class="hint"></span>
       </div>
 
-      <h4>相關謄本原始檔　<label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" id="docSelectAll"> 全選</label></h4>
-      <ul id="documentList"></ul>
-      <div style="margin:10px 0;">
+      <h4 class="no-print">相關謄本原始檔　<label style="font-weight:normal;font-size:0.85rem;"><input type="checkbox" id="docSelectAll"> 全選</label></h4>
+      <ul id="documentList" class="no-print"></ul>
+      <div class="no-print" style="margin:10px 0;">
         <button id="btnDeleteDocs" class="btn danger hidden">刪除勾選的謄本檔案</button>
         <span id="deleteDocsStatus" class="hint"></span>
       </div>
 
-      <hr style="margin:20px 0;border:none;border-top:1px solid var(--border);">
-      <button id="btnDeleteParcel" class="btn danger">刪除此地號（連同共有人明細與謄本檔案）</button>
-      <span id="deleteParcelStatus" class="hint"></span>
+      <hr class="no-print" style="margin:20px 0;border:none;border-top:1px solid var(--border);">
+      <button id="btnDeleteParcel" class="btn danger no-print">刪除此地號（連同共有人明細與謄本檔案）</button>
+      <span id="deleteParcelStatus" class="hint no-print"></span>
     </div>
   </section>
 
 </main>
 
 <script src="config.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

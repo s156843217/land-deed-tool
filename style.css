@@ -212,6 +212,39 @@ table.deed-table th {
   font-size: 1.05rem;
 }
 
+/* 列印地號明細：只印 #parcelDetailPanel 的內容，其他頁面元素（導覽列、其他面板、
+   輸入框邊框、勾選框、按鈕）通通藏起來，印出來才會是一張乾淨的表格，不是整個網頁畫面。
+   共有人表格欄位多，直式印不下常常被切掉，固定用橫式（Chrome/Edge 的列印對話框會直接帶入這個方向，
+   使用者仍可在對話框裡自己改回直式，只是預設值幫她挑對的）。 */
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+  body * { visibility: hidden; }
+  #parcelDetailPanel, #parcelDetailPanel * { visibility: visible; }
+  #parcelDetailPanel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print,
+  #parcelDetailPanel button,
+  #parcelDetailPanel input[type="checkbox"] {
+    display: none !important;
+  }
+  #parcelDetailPanel input[type="text"] {
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+  #ownerDetailTable th:first-child,
+  #ownerDetailTable td:first-child {
+    display: none;
+  }
+}
+
 @media (max-width: 640px) {
   header.site-header {
     flex-direction: column;
