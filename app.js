@@ -643,6 +643,10 @@ async function showParcelDetail(parcel) {
   body.innerHTML = "";
   currentDetailOwners.forEach((o) => body.appendChild(buildOwnerDetailRow(o)));
 
+  const printBody = $("#printOwnerBody");
+  printBody.innerHTML = "";
+  currentDetailOwners.forEach((o) => printBody.appendChild(buildPrintOwnerRow(o)));
+
   const { data: docs } = await sb
     .from("documents")
     .select("*")
@@ -732,6 +736,23 @@ function downloadAsWordDoc(filename, bodyHtml) {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// 列印表格的一列：純文字 td（不是 input），住址太長時會自動換行完整顯示，不會像 input 那樣被欄寬裁掉看不到
+function buildPrintOwnerRow(o) {
+  const share = o.share_numerator && o.share_denominator ? `${o.share_numerator}/${o.share_denominator}` : "";
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>${o.reg_sequence ?? ""}</td>
+    <td>${o.name ?? ""}</td>
+    <td>${o.address ?? ""}</td>
+    <td>${o.phone ?? ""}</td>
+    <td>${share}</td>
+    <td>${o.share_area_ping ?? ""}</td>
+    <td>${o.reg_date ?? ""}</td>
+    <td>${o.reg_reason ?? ""}</td>
+  `;
+  return tr;
 }
 
 // 共有人明細一列：姓名/住址/聯絡電話可以直接編輯，改完按「儲存」才會真的寫回資料庫，

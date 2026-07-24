@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>土地謄本管理工具</title>
-<link rel="stylesheet" href="style.css?v=10">
+<link rel="stylesheet" href="style.css?v=11">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -182,6 +182,20 @@
           <tbody id="ownerDetailBody"></tbody>
         </table>
       </div>
+
+      <!-- 列印專用表格：純文字格子（不是 input），住址才能完整換行顯示不被裁掉，
+           平常畫面上不會看到，只有 @media print 會切換顯示，欄寬也是為橫式列印另外調過的。 -->
+      <table class="deed-table" id="printOwnerTable">
+        <colgroup>
+          <col style="width:6%"><col style="width:10%"><col style="width:34%"><col style="width:10%">
+          <col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:9%">
+        </colgroup>
+        <thead>
+          <tr><th>次序</th><th>姓名</th><th>住址</th><th>電話</th><th>持分</th><th>持分面積(坪)</th><th>登記日期</th><th>登記原因</th></tr>
+        </thead>
+        <tbody id="printOwnerBody"></tbody>
+      </table>
+
       <div class="no-print" style="margin:10px 0;">
         <button id="btnDeleteOwners" class="btn danger hidden">刪除勾選的共有人紀錄</button>
         <span id="deleteOwnersStatus" class="hint"></span>
@@ -203,6 +217,6 @@
 </main>
 
 <script src="config.js"></script>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

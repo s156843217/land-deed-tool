@@ -183,6 +183,8 @@ table.deed-table th {
 
 .hidden { display: none !important; }
 
+#printOwnerTable { display: none; width: 100%; }
+
 #uploadDropZone.drag-over {
   outline: 2px dashed var(--primary);
   outline-offset: -4px;
@@ -234,14 +236,13 @@ table.deed-table th {
   #parcelDetailPanel input[type="checkbox"] {
     display: none !important;
   }
-  #parcelDetailPanel input[type="text"] {
-    border: none;
-    background: transparent;
-    padding: 0;
-  }
-  #ownerDetailTable th:first-child,
-  #ownerDetailTable td:first-child {
+  /* 畫面上編輯用的表格是 input，長住址會被欄寬裁掉、不會自動換行，
+     列印時改用純文字的 #printOwnerTable，欄寬也已經為橫式另外調過（次序窄、電話窄、住址寬）。 */
+  #ownerDetailTable {
     display: none;
+  }
+  #printOwnerTable {
+    display: table;
   }
 }
 
